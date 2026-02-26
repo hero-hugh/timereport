@@ -70,7 +70,9 @@ export class AuthService {
 	}> {
 		const normalizedEmail = email.toLowerCase().trim()
 
-		console.log(`[AUTH] Verifying OTP for: "${normalizedEmail}" with code: "${code}"`)
+		console.log(
+			`[AUTH] Verifying OTP for: "${normalizedEmail}" with code: "${code}"`,
+		)
 
 		// Hitta senaste oanvända koden för denna e-post
 		const otpRecord = await db.otpCode.findFirst({
@@ -83,7 +85,17 @@ export class AuthService {
 			},
 		})
 
-		console.log(`[AUTH] Found OTP record:`, otpRecord ? { id: otpRecord.id, email: otpRecord.email, used: otpRecord.used, attempts: otpRecord.attempts } : 'none')
+		console.log(
+			'[AUTH] Found OTP record:',
+			otpRecord
+				? {
+						id: otpRecord.id,
+						email: otpRecord.email,
+						used: otpRecord.used,
+						attempts: otpRecord.attempts,
+					}
+				: 'none',
+		)
 
 		if (!otpRecord) {
 			return { success: false, error: 'Ingen aktiv kod hittades' }
@@ -109,7 +121,9 @@ export class AuthService {
 
 		// Verifiera koden
 		const codeMatches = verifyOtpCode(code, otpRecord.codeHash)
-		console.log(`[AUTH] Code verification: ${codeMatches ? 'MATCH' : 'NO MATCH'}`)
+		console.log(
+			`[AUTH] Code verification: ${codeMatches ? 'MATCH' : 'NO MATCH'}`,
+		)
 
 		if (!codeMatches) {
 			await db.otpCode.update({

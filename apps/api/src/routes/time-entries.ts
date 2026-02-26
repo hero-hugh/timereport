@@ -53,7 +53,7 @@ timeEntries.get('/week', async (c) => {
 	let weekStart: Date
 	if (dateParam) {
 		// Parse as UTC to avoid timezone issues
-		weekStart = new Date(dateParam + 'T00:00:00.000Z')
+		weekStart = new Date(`${dateParam}T00:00:00.000Z`)
 	} else {
 		weekStart = new Date()
 		weekStart.setUTCHours(0, 0, 0, 0)
