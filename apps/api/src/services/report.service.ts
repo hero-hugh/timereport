@@ -1,5 +1,6 @@
 import type { ReportQuery } from '@time-report/shared'
 import { db } from '../lib/db'
+import { isRedDay } from '../lib/swedish-holidays'
 
 export class ReportService {
 	/**
@@ -143,9 +144,21 @@ export class ReportService {
 				}),
 			])
 
+		// Calculate total working minutes in the month (8h per working day)
+		let workingDays = 0
+		const cursor = new Date(monthStart)
+		while (cursor <= monthEnd) {
+			if (!isRedDay(cursor)) {
+				workingDays++
+			}
+			cursor.setDate(cursor.getDate() + 1)
+		}
+		const monthTotalMinutes = workingDays * 8 * 60
+
 		return {
 			weekMinutes: weekStats._sum.minutes || 0,
 			monthMinutes: monthStats._sum.minutes || 0,
+			monthTotalMinutes,
 			activeProjectsCount: activeProjects,
 			recentEntries,
 		}

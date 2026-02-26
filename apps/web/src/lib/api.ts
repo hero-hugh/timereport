@@ -260,6 +260,7 @@ class ApiClient {
 		return this.request<{
 			weekMinutes: number
 			monthMinutes: number
+			monthTotalMinutes: number
 			activeProjectsCount: number
 			recentEntries: Array<{
 				id: string

@@ -8,6 +8,7 @@ import { formatDate, formatMinutes } from '../lib/utils'
 interface DashboardStats {
 	weekMinutes: number
 	monthMinutes: number
+	monthTotalMinutes: number
 	activeProjectsCount: number
 	recentEntries: Array<{
 		id: string
@@ -74,6 +75,11 @@ export function DashboardPage() {
 						<p className="text-2xl font-bold">
 							{stats ? formatMinutes(stats.monthMinutes) : '-'}
 						</p>
+						{stats && (
+							<p className="text-sm text-muted-foreground">
+								av {formatMinutes(stats.monthTotalMinutes)}
+							</p>
+						)}
 					</CardContent>
 				</Card>
 				<Card>
