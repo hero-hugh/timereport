@@ -1,6 +1,8 @@
 FROM node:20-alpine AS builder
 WORKDIR /app
 
+RUN apk add --no-cache openssl
+
 COPY package.json package-lock.json ./
 COPY apps/api/package.json ./apps/api/
 COPY apps/web/package.json ./apps/web/
@@ -16,8 +18,14 @@ RUN npx prisma generate --schema=apps/api/prisma/schema.prisma
 RUN npm run build --workspace=@time-report/shared
 RUN npm run build --workspace=@time-report/api
 
+# Fix extensionless ESM imports for Node.js runtime
+RUN find apps/api/dist packages/shared/dist -name '*.js' -exec sed -i -E "s/from '(\.\.?\/[^']+)'/from '\1.js'/g" {} +
+
 FROM node:20-alpine
 WORKDIR /app
+
+RUN apk add --no-cache openssl
+
 ENV NODE_ENV=production
 
 COPY --from=builder /app/package.json ./
