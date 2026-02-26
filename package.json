@@ -1,0 +1,27 @@
+{
+	"name": "time-report",
+	"private": true,
+	"workspaces": ["apps/*", "packages/*"],
+	"scripts": {
+		"dev": "turbo dev",
+		"build": "turbo build",
+		"lint": "biome check .",
+		"lint:fix": "biome check --write .",
+		"format": "biome format --write .",
+		"dev:api": "npm run dev --workspace=@time-report/api",
+		"dev:web": "npm run dev --workspace=@time-report/web",
+		"db:push": "npm run db:push --workspace=@time-report/api",
+		"db:studio": "npm run db:studio --workspace=@time-report/api",
+		"test": "turbo test",
+		"test:api": "npm run test --workspace=@time-report/api"
+	},
+	"devDependencies": {
+		"@biomejs/biome": "^1.5.0",
+		"turbo": "^2.0.0",
+		"typescript": "^5.3.0"
+	},
+	"engines": {
+		"node": ">=18"
+	},
+	"packageManager": "npm@10.0.0"
+}

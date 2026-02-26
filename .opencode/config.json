@@ -1,0 +1,6 @@
+{
+	"hooks": {
+		"post-edit": ".opencode/hooks/post-edit.sh",
+		"post-write": ".opencode/hooks/post-edit.sh"
+	}
+}
