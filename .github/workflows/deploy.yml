@@ -1,0 +1,51 @@
+name: Deploy to CapRover
+
+on:
+  push:
+    branches: [master]
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Deploy backend
+        env:
+          CAPROVER_PASSWORD: ${{ secrets.CAPROVER_PASSWORD }}
+        run: |
+          echo '{"schemaVersion":2,"dockerfilePath":"./Dockerfile.api"}' > captain-definition
+
+          tar --exclude='.git' --exclude='node_modules' --exclude='dist' -czf /tmp/deploy-backend.tar.gz .
+
+          TOKEN=$(curl -sf "https://captain.app.svens.tech/api/v2/login" \
+            -X POST \
+            -H "Content-Type: application/json" \
+            -H "x-namespace: captain" \
+            -d "{\"password\":\"${CAPROVER_PASSWORD}\"}" | jq -r '.data.token')
+
+          curl -sf "https://captain.app.svens.tech/api/v2/user/apps/appData/timereport-backend" \
+            -X POST \
+            -H "x-namespace: captain" \
+            -H "x-captain-auth: ${TOKEN}" \
+            -F "sourceFile=@/tmp/deploy-backend.tar.gz"
+
+      - name: Deploy frontend
+        env:
+          CAPROVER_PASSWORD: ${{ secrets.CAPROVER_PASSWORD }}
+        run: |
+          echo '{"schemaVersion":2,"dockerfilePath":"./Dockerfile.web"}' > captain-definition
+
+          tar --exclude='.git' --exclude='node_modules' --exclude='dist' -czf /tmp/deploy-frontend.tar.gz .
+
+          TOKEN=$(curl -sf "https://captain.app.svens.tech/api/v2/login" \
+            -X POST \
+            -H "Content-Type: application/json" \
+            -H "x-namespace: captain" \
+            -d "{\"password\":\"${CAPROVER_PASSWORD}\"}" | jq -r '.data.token')
+
+          curl -sf "https://captain.app.svens.tech/api/v2/user/apps/appData/timereport-frontend" \
+            -X POST \
+            -H "x-namespace: captain" \
+            -H "x-captain-auth: ${TOKEN}" \
+            -F "sourceFile=@/tmp/deploy-frontend.tar.gz"
