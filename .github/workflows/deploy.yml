@@ -40,6 +40,8 @@ jobs:
           context: .
           file: ./Dockerfile.web
           push: true
+          build-args: |
+            VITE_API_URL=https://timereport-backend.app.svens.tech
           tags: |
             ${{ env.IMAGE_PREFIX }}/frontend:latest
             ${{ env.IMAGE_PREFIX }}/frontend:${{ github.sha }}
