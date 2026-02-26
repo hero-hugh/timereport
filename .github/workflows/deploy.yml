@@ -1,0 +1,83 @@
+name: Deploy to CapRover
+
+on:
+  push:
+    branches: [master]
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_PREFIX: ghcr.io/hero-hugh/timereport
+
+jobs:
+  build-and-push:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Log in to ghcr.io
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and push backend image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: ./Dockerfile.api
+          push: true
+          tags: |
+            ${{ env.IMAGE_PREFIX }}/backend:latest
+            ${{ env.IMAGE_PREFIX }}/backend:${{ github.sha }}
+
+      - name: Build and push frontend image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: ./Dockerfile.web
+          push: true
+          tags: |
+            ${{ env.IMAGE_PREFIX }}/frontend:latest
+            ${{ env.IMAGE_PREFIX }}/frontend:${{ github.sha }}
+
+  deploy:
+    runs-on: ubuntu-latest
+    needs: build-and-push
+    steps:
+      - name: Deploy backend to CapRover
+        env:
+          CAPROVER_PASSWORD: ${{ secrets.CAPROVER_PASSWORD }}
+        run: |
+          TOKEN=$(curl -sf "https://captain.app.svens.tech/api/v2/login" \
+            -X POST \
+            -H "Content-Type: application/json" \
+            -H "x-namespace: captain" \
+            -d "{\"password\":\"${CAPROVER_PASSWORD}\"}" | jq -r '.data.token')
+
+          curl -sf "https://captain.app.svens.tech/api/v2/user/apps/appData/timereport-backend" \
+            -X POST \
+            -H "Content-Type: application/json" \
+            -H "x-namespace: captain" \
+            -H "x-captain-auth: ${TOKEN}" \
+            -d '{"captainDefinitionContent":"{\"schemaVersion\":2,\"imageName\":\"ghcr.io/hero-hugh/timereport/backend:${{ github.sha }}\"}"}'
+
+      - name: Deploy frontend to CapRover
+        env:
+          CAPROVER_PASSWORD: ${{ secrets.CAPROVER_PASSWORD }}
+        run: |
+          TOKEN=$(curl -sf "https://captain.app.svens.tech/api/v2/login" \
+            -X POST \
+            -H "Content-Type: application/json" \
+            -H "x-namespace: captain" \
+            -d "{\"password\":\"${CAPROVER_PASSWORD}\"}" | jq -r '.data.token')
+
+          curl -sf "https://captain.app.svens.tech/api/v2/user/apps/appData/timereport-frontend" \
+            -X POST \
+            -H "Content-Type: application/json" \
+            -H "x-namespace: captain" \
+            -H "x-captain-auth: ${TOKEN}" \
+            -d '{"captainDefinitionContent":"{\"schemaVersion\":2,\"imageName\":\"ghcr.io/hero-hugh/timereport/frontend:${{ github.sha }}\"}"}'

@@ -1,0 +1,12 @@
+node_modules
+dist
+.turbo
+.git
+.env
+.env.*
+*.db
+*.db-journal
+coverage
+.DS_Store
+scripts
+.continuous-linear-loop
