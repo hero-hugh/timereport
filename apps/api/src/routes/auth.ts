@@ -60,17 +60,17 @@ auth.post('/verify-otp', async (c) => {
 		parsed.data.code,
 	)
 
-	if (!result.success) {
+	if (!result.success || !result.accessToken || !result.refreshToken) {
 		return c.json({ success: false, error: result.error }, 401)
 	}
 
 	// Sätt cookies
-	setCookie(c, 'access_token', result.accessToken!, {
+	setCookie(c, 'access_token', result.accessToken, {
 		...JWT_CONFIG.cookieOptions,
 		maxAge: 15 * 60, // 15 minuter
 	})
 
-	setCookie(c, 'refresh_token', result.refreshToken!, {
+	setCookie(c, 'refresh_token', result.refreshToken, {
 		...JWT_CONFIG.cookieOptions,
 		maxAge: 7 * 24 * 60 * 60, // 7 dagar
 	})
@@ -96,7 +96,7 @@ auth.post('/refresh', async (c) => {
 
 	const result = await authService.refreshAccessToken(refreshToken)
 
-	if (!result.success) {
+	if (!result.success || !result.accessToken || !result.newRefreshToken) {
 		// Rensa cookies vid misslyckande
 		deleteCookie(c, 'access_token')
 		deleteCookie(c, 'refresh_token')
@@ -104,12 +104,12 @@ auth.post('/refresh', async (c) => {
 	}
 
 	// Sätt nya cookies
-	setCookie(c, 'access_token', result.accessToken!, {
+	setCookie(c, 'access_token', result.accessToken, {
 		...JWT_CONFIG.cookieOptions,
 		maxAge: 15 * 60,
 	})
 
-	setCookie(c, 'refresh_token', result.newRefreshToken!, {
+	setCookie(c, 'refresh_token', result.newRefreshToken, {
 		...JWT_CONFIG.cookieOptions,
 		maxAge: 7 * 24 * 60 * 60,
 	})

@@ -84,8 +84,10 @@ export class TimeEntryService {
 		}
 
 		// Parse date as UTC to avoid timezone issues
-		const date = new Date(data.date + 'T00:00:00.000Z')
-		console.log(`[TIME-ENTRY] Creating/updating entry: projectId=${data.projectId}, date=${data.date}, parsed=${date.toISOString()}, minutes=${data.minutes}`)
+		const date = new Date(`${data.date}T00:00:00.000Z`)
+		console.log(
+			`[TIME-ENTRY] Creating/updating entry: projectId=${data.projectId}, date=${data.date}, parsed=${date.toISOString()}, minutes=${data.minutes}`,
+		)
 
 		// Upsert - skapa eller uppdatera befintlig entry
 		const entry = await db.timeEntry.upsert({
@@ -187,7 +189,9 @@ export class TimeEntryService {
 		// Set to end of day to include all entries on the last day
 		weekEnd.setHours(23, 59, 59, 999)
 
-		console.log(`[TIME-ENTRY] getWeekEntries: userId=${userId}, weekStart=${weekStart.toISOString()}, weekEnd=${weekEnd.toISOString()}`)
+		console.log(
+			`[TIME-ENTRY] getWeekEntries: userId=${userId}, weekStart=${weekStart.toISOString()}, weekEnd=${weekEnd.toISOString()}`,
+		)
 
 		const entries = await db.timeEntry.findMany({
 			where: {

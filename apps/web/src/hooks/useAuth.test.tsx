@@ -14,7 +14,7 @@ vi.mock('../lib/api', () => ({
 
 import { api } from '../lib/api'
 
-const mockApi = api as {
+const mockApi = api as unknown as {
 	getMe: ReturnType<typeof vi.fn>
 	verifyOtp: ReturnType<typeof vi.fn>
 	logout: ReturnType<typeof vi.fn>
@@ -111,12 +111,12 @@ describe('useAuth', () => {
 				expect(result.current.isLoading).toBe(false)
 			})
 
-			let loginResult: { success: boolean; error?: string }
+			let loginResult = {} as { success: boolean; error?: string }
 			await act(async () => {
 				loginResult = await result.current.login('test@example.com', '123456')
 			})
 
-			expect(loginResult!.success).toBe(true)
+			expect(loginResult.success).toBe(true)
 			expect(result.current.user).toEqual(mockUser)
 			expect(result.current.isAuthenticated).toBe(true)
 			expect(mockApi.verifyOtp).toHaveBeenCalledWith(
@@ -137,13 +137,13 @@ describe('useAuth', () => {
 				expect(result.current.isLoading).toBe(false)
 			})
 
-			let loginResult: { success: boolean; error?: string }
+			let loginResult = {} as { success: boolean; error?: string }
 			await act(async () => {
 				loginResult = await result.current.login('test@example.com', '000000')
 			})
 
-			expect(loginResult!.success).toBe(false)
-			expect(loginResult!.error).toBe('Fel kod')
+			expect(loginResult.success).toBe(false)
+			expect(loginResult.error).toBe('Fel kod')
 			expect(result.current.user).toBe(null)
 		})
 
@@ -158,13 +158,13 @@ describe('useAuth', () => {
 				expect(result.current.isLoading).toBe(false)
 			})
 
-			let loginResult: { success: boolean; error?: string }
+			let loginResult = {} as { success: boolean; error?: string }
 			await act(async () => {
 				loginResult = await result.current.login('test@example.com', '000000')
 			})
 
-			expect(loginResult!.success).toBe(false)
-			expect(loginResult!.error).toBe('Inloggning misslyckades')
+			expect(loginResult.success).toBe(false)
+			expect(loginResult.error).toBe('Inloggning misslyckades')
 		})
 	})
 
