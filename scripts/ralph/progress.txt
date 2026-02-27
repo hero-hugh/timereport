@@ -13,6 +13,7 @@ Started: fre 27 feb 2026 21:55:43 CET
 - `createUserDatabase(userId)` uses `prisma db push` to initialize per-user SQLite files
 - `import.meta.url` path resolution from `src/lib/`: go up 2 levels (`../..`) to reach `apps/api/`
 - Monorepo root prisma binary at `../../node_modules/.bin/prisma` relative to `apps/api/`
+- Use `vi.mock` with factory for module mocking in tests; use `vi.mocked(fn).mockRejectedValueOnce()` for async error simulation
 
 ---
 
@@ -56,4 +57,19 @@ Started: fre 27 feb 2026 21:55:43 CET
   - `PrismaClient` from generated clients accepts `datasourceUrl` option to override the schema-defined URL at runtime
   - `prisma db push --skip-generate --accept-data-loss` is the right command for creating tables in new SQLite files
   - Test setup must set `AUTH_DATABASE_URL` and `USER_DATABASE_URL` in addition to `DATABASE_URL` for the new generated clients
+---
+
+## 2026-02-27 22:15 - US-003
+- Integrated `createUserDatabase(userId)` call into `AuthService.verifyOtp()` for new user creation
+- Added rollback: if per-user DB creation fails, the user is deleted from the central DB
+- Added 3 new tests: verifies DB creation on new user, rollback on failure, no DB creation for existing users
+- Used `vi.mock` to mock `../lib/user-db` in auth service tests (createUserDatabase already tested in user-db.test.ts)
+- Files changed:
+  - `apps/api/src/services/auth.service.ts` (modified) - Import createUserDatabase, call it after user creation, handle rollback
+  - `apps/api/src/services/auth.service.test.ts` (modified) - Added vi.mock for user-db, 3 new test cases
+- **Learnings for future iterations:**
+  - Use `vi.mock` with factory function for mocking modules in vitest - `vi.mock('../lib/user-db', () => ({ ... }))`
+  - Use `vi.mocked(fn).mockRejectedValueOnce()` to simulate errors for async functions
+  - `createUserDatabase` already handles: creating DATABASE_DIR, skipping existing DB files - no need to duplicate that logic in the auth service
+  - The existing user path in verifyOtp does `findUnique` first, so createUserDatabase is only called in the `!user` branch
 ---

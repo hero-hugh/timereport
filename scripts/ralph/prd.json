@@ -41,7 +41,7 @@
         "If DB file creation fails, the user creation in the central DB is rolled back"
       ],
       "priority": 3,
-      "passes": false
+      "passes": true
     },
     {
       "id": "US-004",
