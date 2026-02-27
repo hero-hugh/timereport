@@ -81,7 +81,7 @@ export function LoginPage() {
 	}
 
 	return (
-		<div className="min-h-screen flex items-center justify-center p-4 bg-muted/50">
+		<div className="min-h-screen flex flex-col items-center justify-center p-4 bg-muted/50">
 			<Card className="w-full max-w-md">
 				<CardHeader className="text-center">
 					<div className="mx-auto mb-4 text-4xl">⏱</div>
@@ -162,6 +162,10 @@ export function LoginPage() {
 					)}
 				</CardContent>
 			</Card>
+			<footer className="mt-8 w-full max-w-md text-center text-sm text-muted-foreground space-y-1">
+				<p>Tidrapportering - Ett verktyg för enkel och effektiv tidsredovisning.</p>
+				<p>Vid frågor eller support, kontakta din administratör.</p>
+			</footer>
 		</div>
 	)
 }
