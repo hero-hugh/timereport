@@ -2,7 +2,6 @@ import type {
 	CreateProjectInput,
 	UpdateProjectInput,
 } from '@time-report/shared'
-import { db } from '../lib/db'
 import type { UserPrismaClient } from '../lib/user-db'
 
 export class ProjectService {
@@ -10,13 +9,12 @@ export class ProjectService {
 	 * Hämta alla projekt för en användare
 	 */
 	async getProjects(
-		_userDb: UserPrismaClient,
-		userId: string,
+		userDb: UserPrismaClient,
+		_userId: string,
 		includeInactive = false,
 	) {
-		const projects = await db.project.findMany({
+		const projects = await userDb.project.findMany({
 			where: {
-				userId,
 				...(includeInactive ? {} : { isActive: true }),
 			},
 			orderBy: { createdAt: 'desc' },
@@ -25,7 +23,7 @@ export class ProjectService {
 		// Beräkna statistik för varje projekt
 		const projectsWithStats = await Promise.all(
 			projects.map(async (project) => {
-				const stats = await db.timeEntry.aggregate({
+				const stats = await userDb.timeEntry.aggregate({
 					where: { projectId: project.id },
 					_sum: { minutes: true },
 				})
@@ -50,17 +48,17 @@ export class ProjectService {
 	 * Hämta ett specifikt projekt
 	 */
 	async getProject(
-		_userDb: UserPrismaClient,
+		userDb: UserPrismaClient,
 		projectId: string,
-		userId: string,
+		_userId: string,
 	) {
-		const project = await db.project.findFirst({
-			where: { id: projectId, userId },
+		const project = await userDb.project.findFirst({
+			where: { id: projectId },
 		})
 
 		if (!project) return null
 
-		const stats = await db.timeEntry.aggregate({
+		const stats = await userDb.timeEntry.aggregate({
 			where: { projectId: project.id },
 			_sum: { minutes: true },
 		})
@@ -81,13 +79,12 @@ export class ProjectService {
 	 * Skapa nytt projekt
 	 */
 	async createProject(
-		_userDb: UserPrismaClient,
-		userId: string,
+		userDb: UserPrismaClient,
+		_userId: string,
 		data: CreateProjectInput,
 	) {
-		return db.project.create({
+		return userDb.project.create({
 			data: {
-				userId,
 				name: data.name,
 				description: data.description,
 				hourlyRate: data.hourlyRate,
@@ -101,19 +98,18 @@ export class ProjectService {
 	 * Uppdatera projekt
 	 */
 	async updateProject(
-		_userDb: UserPrismaClient,
+		userDb: UserPrismaClient,
 		projectId: string,
-		userId: string,
+		_userId: string,
 		data: UpdateProjectInput,
 	) {
-		// Verifiera att projektet tillhör användaren
-		const project = await db.project.findFirst({
-			where: { id: projectId, userId },
+		const project = await userDb.project.findFirst({
+			where: { id: projectId },
 		})
 
 		if (!project) return null
 
-		return db.project.update({
+		return userDb.project.update({
 			where: { id: projectId },
 			data: {
 				...(data.name !== undefined && { name: data.name }),
@@ -136,18 +132,17 @@ export class ProjectService {
 	 * Ta bort projekt
 	 */
 	async deleteProject(
-		_userDb: UserPrismaClient,
+		userDb: UserPrismaClient,
 		projectId: string,
-		userId: string,
+		_userId: string,
 	) {
-		// Verifiera att projektet tillhör användaren
-		const project = await db.project.findFirst({
-			where: { id: projectId, userId },
+		const project = await userDb.project.findFirst({
+			where: { id: projectId },
 		})
 
 		if (!project) return false
 
-		await db.project.delete({
+		await userDb.project.delete({
 			where: { id: projectId },
 		})
 

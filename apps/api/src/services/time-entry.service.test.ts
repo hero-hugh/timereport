@@ -1,25 +1,18 @@
 import { beforeEach, describe, expect, it } from 'vitest'
-import { db } from '../lib/db'
-import type { UserPrismaClient } from '../lib/user-db'
+import { testUserDb } from '../test/test-user-db'
 import { timeEntryService } from './time-entry.service'
 
-// Placeholder for per-user DB client (unused in service bodies until US-005)
-const userDb = db as unknown as UserPrismaClient
+// User isolation is now handled at the DB level (each user has their own DB).
+// The userId parameter is kept for API compatibility but not used in queries.
+const testUserId = 'test-user-id'
 
 describe('TimeEntryService', () => {
-	let testUserId: string
 	let testProjectId: string
 
 	beforeEach(async () => {
-		// Skapa testanvändare och projekt
-		const user = await db.user.create({
-			data: { email: 'test@example.com' },
-		})
-		testUserId = user.id
-
-		const project = await db.project.create({
+		// Create test project in per-user DB (no userId needed)
+		const project = await testUserDb.project.create({
 			data: {
-				userId: testUserId,
 				name: 'Test Project',
 				startDate: new Date('2024-01-01'),
 				isActive: true,
@@ -31,7 +24,7 @@ describe('TimeEntryService', () => {
 	describe('createOrUpdateTimeEntry', () => {
 		it('should create a new time entry', async () => {
 			const result = await timeEntryService.createOrUpdateTimeEntry(
-				userDb,
+				testUserDb,
 				testUserId,
 				{
 					projectId: testProjectId,
@@ -48,7 +41,7 @@ describe('TimeEntryService', () => {
 
 		it('should update existing entry for same project/date', async () => {
 			// Skapa första entry
-			await timeEntryService.createOrUpdateTimeEntry(userDb, testUserId, {
+			await timeEntryService.createOrUpdateTimeEntry(testUserDb, testUserId, {
 				projectId: testProjectId,
 				date: '2024-01-15',
 				minutes: 60,
@@ -56,7 +49,7 @@ describe('TimeEntryService', () => {
 
 			// Uppdatera med ny tid
 			const result = await timeEntryService.createOrUpdateTimeEntry(
-				userDb,
+				testUserDb,
 				testUserId,
 				{
 					projectId: testProjectId,
@@ -70,20 +63,20 @@ describe('TimeEntryService', () => {
 			expect(result.data?.minutes).toBe(120)
 
 			// Verifiera att det bara finns en entry
-			const entries = await db.timeEntry.findMany({
+			const entries = await testUserDb.timeEntry.findMany({
 				where: { projectId: testProjectId },
 			})
 			expect(entries).toHaveLength(1)
 		})
 
 		it('should return error for inactive project', async () => {
-			await db.project.update({
+			await testUserDb.project.update({
 				where: { id: testProjectId },
 				data: { isActive: false },
 			})
 
 			const result = await timeEntryService.createOrUpdateTimeEntry(
-				userDb,
+				testUserDb,
 				testUserId,
 				{
 					projectId: testProjectId,
@@ -98,7 +91,7 @@ describe('TimeEntryService', () => {
 
 		it('should return error for non-existent project', async () => {
 			const result = await timeEntryService.createOrUpdateTimeEntry(
-				userDb,
+				testUserDb,
 				testUserId,
 				{
 					projectId: 'non-existent-id',
@@ -114,23 +107,20 @@ describe('TimeEntryService', () => {
 	describe('getTimeEntries', () => {
 		beforeEach(async () => {
 			// Skapa flera tidrapporter
-			await db.timeEntry.createMany({
+			await testUserDb.timeEntry.createMany({
 				data: [
 					{
 						projectId: testProjectId,
-						userId: testUserId,
 						date: new Date('2024-01-10'),
 						minutes: 60,
 					},
 					{
 						projectId: testProjectId,
-						userId: testUserId,
 						date: new Date('2024-01-15'),
 						minutes: 120,
 					},
 					{
 						projectId: testProjectId,
-						userId: testUserId,
 						date: new Date('2024-01-20'),
 						minutes: 90,
 					},
@@ -138,9 +128,9 @@ describe('TimeEntryService', () => {
 			})
 		})
 
-		it('should return all entries for user', async () => {
+		it('should return all entries', async () => {
 			const entries = await timeEntryService.getTimeEntries(
-				userDb,
+				testUserDb,
 				testUserId,
 				{},
 			)
@@ -149,7 +139,7 @@ describe('TimeEntryService', () => {
 
 		it('should filter by date range', async () => {
 			const entries = await timeEntryService.getTimeEntries(
-				userDb,
+				testUserDb,
 				testUserId,
 				{
 					from: '2024-01-12',
@@ -162,26 +152,24 @@ describe('TimeEntryService', () => {
 
 		it('should filter by projectId', async () => {
 			// Skapa annat projekt med tidrapport
-			const otherProject = await db.project.create({
+			const otherProject = await testUserDb.project.create({
 				data: {
-					userId: testUserId,
 					name: 'Other Project',
 					startDate: new Date('2024-01-01'),
 					isActive: true,
 				},
 			})
 
-			await db.timeEntry.create({
+			await testUserDb.timeEntry.create({
 				data: {
 					projectId: otherProject.id,
-					userId: testUserId,
 					date: new Date('2024-01-15'),
 					minutes: 30,
 				},
 			})
 
 			const entries = await timeEntryService.getTimeEntries(
-				userDb,
+				testUserDb,
 				testUserId,
 				{
 					projectId: testProjectId,
@@ -194,7 +182,7 @@ describe('TimeEntryService', () => {
 
 		it('should include project info', async () => {
 			const entries = await timeEntryService.getTimeEntries(
-				userDb,
+				testUserDb,
 				testUserId,
 				{},
 			)
@@ -207,23 +195,20 @@ describe('TimeEntryService', () => {
 	describe('getWeekEntries', () => {
 		it('should return entries for the week', async () => {
 			// Måndag 2024-01-15 till söndag 2024-01-21
-			await db.timeEntry.createMany({
+			await testUserDb.timeEntry.createMany({
 				data: [
 					{
 						projectId: testProjectId,
-						userId: testUserId,
 						date: new Date('2024-01-15'), // Måndag
 						minutes: 60,
 					},
 					{
 						projectId: testProjectId,
-						userId: testUserId,
 						date: new Date('2024-01-17'), // Onsdag
 						minutes: 120,
 					},
 					{
 						projectId: testProjectId,
-						userId: testUserId,
 						date: new Date('2024-01-22'), // Nästa måndag - utanför
 						minutes: 90,
 					},
@@ -232,7 +217,7 @@ describe('TimeEntryService', () => {
 
 			const weekStart = new Date('2024-01-15')
 			const entries = await timeEntryService.getWeekEntries(
-				userDb,
+				testUserDb,
 				testUserId,
 				weekStart,
 			)
@@ -243,23 +228,22 @@ describe('TimeEntryService', () => {
 
 	describe('deleteTimeEntry', () => {
 		it('should delete entry', async () => {
-			const entry = await db.timeEntry.create({
+			const entry = await testUserDb.timeEntry.create({
 				data: {
 					projectId: testProjectId,
-					userId: testUserId,
 					date: new Date('2024-01-15'),
 					minutes: 60,
 				},
 			})
 
 			const result = await timeEntryService.deleteTimeEntry(
-				userDb,
+				testUserDb,
 				entry.id,
 				testUserId,
 			)
 			expect(result).toBe(true)
 
-			const deleted = await db.timeEntry.findUnique({
+			const deleted = await testUserDb.timeEntry.findUnique({
 				where: { id: entry.id },
 			})
 			expect(deleted).toBeNull()
@@ -267,39 +251,11 @@ describe('TimeEntryService', () => {
 
 		it('should return false for non-existent entry', async () => {
 			const result = await timeEntryService.deleteTimeEntry(
-				userDb,
+				testUserDb,
 				'non-existent-id',
 				testUserId,
 			)
 			expect(result).toBe(false)
-		})
-
-		it('should not delete other users entries', async () => {
-			const otherUser = await db.user.create({
-				data: { email: 'other@example.com' },
-			})
-
-			const entry = await db.timeEntry.create({
-				data: {
-					projectId: testProjectId,
-					userId: testUserId,
-					date: new Date('2024-01-15'),
-					minutes: 60,
-				},
-			})
-
-			const result = await timeEntryService.deleteTimeEntry(
-				userDb,
-				entry.id,
-				otherUser.id,
-			)
-			expect(result).toBe(false)
-
-			// Entry ska fortfarande finnas
-			const stillExists = await db.timeEntry.findUnique({
-				where: { id: entry.id },
-			})
-			expect(stillExists).not.toBeNull()
 		})
 	})
 })
