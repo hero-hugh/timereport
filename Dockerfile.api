@@ -14,12 +14,20 @@ COPY apps/api/ ./apps/api/
 COPY packages/shared/ ./packages/shared/
 COPY tsconfig.json ./
 
-RUN npx prisma generate --schema=apps/api/prisma/schema.prisma
+# Generate Prisma clients for both schemas (auth + per-user)
+RUN npx prisma generate --schema=apps/api/prisma/central/schema.prisma
+RUN npx prisma generate --schema=apps/api/prisma/user/schema.prisma
+
 RUN npm run build --workspace=@time-report/shared
 RUN npm run build --workspace=@time-report/api
 
 # Fix extensionless ESM imports for Node.js runtime
-RUN find apps/api/dist packages/shared/dist -name '*.js' -exec sed -i -E "s/from '(\.\.?\/[^']+)'/from '\1.js'/g" {} +
+# Two-pass: first strip existing .js from relative imports, then add .js to all
+RUN find apps/api/dist packages/shared/dist -name '*.js' -exec sed -i -E \
+  "s/from '(\.\.?\/[^']+)\.js'/from '\1'/g; s/from '(\.\.?\/[^']+)'/from '\1.js'/g" {} +
+
+# Copy generated Prisma clients into dist so compiled JS can resolve them
+RUN cp -r apps/api/src/generated apps/api/dist/generated
 
 FROM node:20-alpine
 WORKDIR /app
@@ -36,6 +44,9 @@ COPY --from=builder /app/packages/shared/package.json ./packages/shared/
 
 RUN npm ci
 
+# Install prisma CLI for runtime schema operations (per-user DB creation)
+RUN npm install --no-save prisma@5
+
 COPY --from=builder /app/apps/api/dist/ ./apps/api/dist/
 COPY --from=builder /app/apps/api/prisma/ ./apps/api/prisma/
 COPY --from=builder /app/packages/shared/dist/ ./packages/shared/dist/
@@ -43,8 +54,13 @@ COPY --from=builder /app/packages/shared/dist/ ./packages/shared/dist/
 # Point shared package exports to compiled JS instead of TS source
 RUN sed -i 's|./src/index.ts|./dist/index.js|g' packages/shared/package.json
 
-RUN npx prisma generate --schema=apps/api/prisma/schema.prisma
+# Create database directory for per-user SQLite files
+RUN mkdir -p /app/data
+
+# Mark data directory as a volume for persistence
+VOLUME ["/app/data"]
 
 EXPOSE 3000
 
-CMD ["sh", "-c", "npx prisma db push --schema=apps/api/prisma/schema.prisma --skip-generate && node apps/api/dist/index.js"]
+# Push auth schema at startup, then start the server
+CMD ["sh", "-c", "npx prisma db push --schema=apps/api/prisma/central/schema.prisma --skip-generate && node apps/api/dist/index.js"]

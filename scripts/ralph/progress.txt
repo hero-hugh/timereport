@@ -3,9 +3,12 @@ Started: fre 27 feb 2026 21:55:43 CET
 
 ## Codebase Patterns
 - Use local `node_modules/.bin/prisma` (v5.22) not global `npx prisma` (pulls v7 with breaking changes)
-- Tests need `DATABASE_URL` set before importing `db` - set env vars in `apps/api/src/test/setup.ts` before dynamic import
+- Tests need env vars set before importing DB clients - set env vars in `apps/api/src/test/setup.ts` before dynamic import
+- Auth service and tests use `authDb` from `src/lib/auth-db.ts` (not `db` from `src/lib/db.ts`)
 - Generated Prisma clients go to `apps/api/src/generated/{auth,user}` - excluded from biome and gitignore
-- Original `prisma/schema.prisma` kept for backward compat while migration is in progress
+- Original `prisma/schema.prisma` and `src/lib/db.ts` are legacy - all code now uses `authDb` or `userDb`
+- Dockerfile.api generates both schemas, copies generated clients to `dist/generated/`, installs prisma CLI for runtime `createUserDatabase`
+- ESM import fix in Docker uses two-pass sed to handle `.js` extensions idempotently
 - Biome config at root `biome.json` - add generated directories to `files.ignore`
 - Test DB: `DATABASE_URL="file:./test.db"` with `prisma db push --skip-generate --accept-data-loss` before running tests
 - Auth DB: `authDb` singleton in `src/lib/auth-db.ts` using generated auth client
@@ -135,4 +138,26 @@ Started: fre 27 feb 2026 21:55:43 CET
   - Cross-user isolation tests become meaningless with per-user DBs - DB-level isolation replaces query-level filtering
   - Absolute paths for test DB URLs (via `import.meta.url` resolution) prevent path-resolution surprises across different Prisma schemas
   - `testUserDb` global singleton pattern (via globalThis) ensures all test files share one connection
+---
+
+## 2026-02-27 22:55 - US-006
+- Updated Dockerfile.api for per-user database architecture
+- Migrated `auth.service.ts` and `auth.service.test.ts` from old `db` singleton to `authDb` (central auth client)
+- Updated `test/setup.ts` to use `authDb` for auth table cleanup, push auth schema to test.db in beforeAll
+- Dockerfile changes: generate both schemas (central + user), copy generated clients to dist, install prisma CLI for runtime, create data dir, add VOLUME, push auth schema at startup
+- Fixed ESM import sed to use two-pass approach (strip existing .js, then add .js) to avoid double `.js.js` extensions
+- .env.example already documented from US-001 (AUTH_DATABASE_URL, DATABASE_DIR, USER_DATABASE_URL)
+- Files changed:
+  - `Dockerfile.api` (modified) - Complete rewrite for per-user DB architecture
+  - `apps/api/src/services/auth.service.ts` (modified) - `db` → `authDb` from `../lib/auth-db`
+  - `apps/api/src/services/auth.service.test.ts` (modified) - `db` → `authDb` from `../lib/auth-db`
+  - `apps/api/src/test/setup.ts` (modified) - Use `authDb`, push both schemas in beforeAll
+  - `scripts/ralph/prd.json` (modified) - Marked US-006 as passes: true
+- **Learnings for future iterations:**
+  - `auth.service.ts` was still using old `db` from `@prisma/client` - needed migration to `authDb` for Docker to work (old schema not generated in Docker)
+  - ESM import sed command doubles `.js` extension on imports that already have `.js` - use two-pass sed: first strip `.js`, then add `.js`
+  - Docker runtime needs prisma CLI installed separately (`npm install --no-save prisma@5`) since it's a devDependency not included in production npm ci
+  - Generated Prisma clients must be copied from `src/generated/` to `dist/generated/` for compiled JS imports to resolve correctly
+  - Test setup must push auth schema to test.db (not just rely on old schema) since authDb expects auth schema tables
+  - `VOLUME ["/app/data"]` in Dockerfile ensures per-user SQLite files persist across container restarts
 ---

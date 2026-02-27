@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { db } from '../lib/db'
+import { authDb } from '../lib/auth-db'
 import { authService } from './auth.service'
 
 vi.mock('../lib/user-db', () => ({
@@ -15,7 +15,7 @@ describe('AuthService', () => {
 
 			expect(result.success).toBe(true)
 
-			const otpCode = await db.otpCode.findFirst({
+			const otpCode = await authDb.otpCode.findFirst({
 				where: { email: 'test@example.com' },
 			})
 			expect(otpCode).not.toBeNull()
@@ -29,7 +29,7 @@ describe('AuthService', () => {
 			// Begär ny kod
 			await authService.requestOtp('test@example.com')
 
-			const otpCodes = await db.otpCode.findMany({
+			const otpCodes = await authDb.otpCode.findMany({
 				where: { email: 'test@example.com' },
 			})
 
@@ -42,7 +42,7 @@ describe('AuthService', () => {
 		it('should normalize email to lowercase', async () => {
 			await authService.requestOtp('Test@EXAMPLE.com')
 
-			const otpCode = await db.otpCode.findFirst({
+			const otpCode = await authDb.otpCode.findFirst({
 				where: { email: 'test@example.com' },
 			})
 			expect(otpCode).not.toBeNull()
@@ -60,7 +60,7 @@ describe('AuthService', () => {
 		it('should return error for wrong code', async () => {
 			// Skapa OTP manuellt för att veta koden
 			const { hashOtpCode, getOtpExpiry } = await import('../lib/otp')
-			await db.otpCode.create({
+			await authDb.otpCode.create({
 				data: {
 					email: 'test@example.com',
 					codeHash: hashOtpCode('123456'),
@@ -76,7 +76,7 @@ describe('AuthService', () => {
 
 		it('should increment attempts on wrong code', async () => {
 			const { hashOtpCode, getOtpExpiry } = await import('../lib/otp')
-			await db.otpCode.create({
+			await authDb.otpCode.create({
 				data: {
 					email: 'test@example.com',
 					codeHash: hashOtpCode('123456'),
@@ -86,7 +86,7 @@ describe('AuthService', () => {
 
 			await authService.verifyOtp('test@example.com', '654321')
 
-			const otpCode = await db.otpCode.findFirst({
+			const otpCode = await authDb.otpCode.findFirst({
 				where: { email: 'test@example.com' },
 			})
 			expect(otpCode?.attempts).toBe(1)
@@ -95,7 +95,7 @@ describe('AuthService', () => {
 		it('should create user and return tokens for correct code', async () => {
 			const { createUserDatabase } = await import('../lib/user-db')
 			const { hashOtpCode, getOtpExpiry } = await import('../lib/otp')
-			await db.otpCode.create({
+			await authDb.otpCode.create({
 				data: {
 					email: 'newuser@example.com',
 					codeHash: hashOtpCode('123456'),
@@ -114,7 +114,7 @@ describe('AuthService', () => {
 			expect(result.user?.email).toBe('newuser@example.com')
 
 			// Verifiera att användare skapades
-			const user = await db.user.findUnique({
+			const user = await authDb.user.findUnique({
 				where: { email: 'newuser@example.com' },
 			})
 			expect(user).not.toBeNull()
@@ -130,7 +130,7 @@ describe('AuthService', () => {
 			)
 
 			const { hashOtpCode, getOtpExpiry } = await import('../lib/otp')
-			await db.otpCode.create({
+			await authDb.otpCode.create({
 				data: {
 					email: 'failuser@example.com',
 					codeHash: hashOtpCode('123456'),
@@ -147,7 +147,7 @@ describe('AuthService', () => {
 			expect(result.error).toBe('Kunde inte skapa användardatabas')
 
 			// Verify user was rolled back (deleted from central DB)
-			const user = await db.user.findUnique({
+			const user = await authDb.user.findUnique({
 				where: { email: 'failuser@example.com' },
 			})
 			expect(user).toBeNull()
@@ -160,11 +160,11 @@ describe('AuthService', () => {
 			const { hashOtpCode, getOtpExpiry } = await import('../lib/otp')
 
 			// Create existing user first
-			await db.user.create({
+			await authDb.user.create({
 				data: { email: 'existing-db@example.com' },
 			})
 
-			await db.otpCode.create({
+			await authDb.otpCode.create({
 				data: {
 					email: 'existing-db@example.com',
 					codeHash: hashOtpCode('123456'),
@@ -184,12 +184,12 @@ describe('AuthService', () => {
 
 		it('should login existing user', async () => {
 			// Skapa användare först
-			const user = await db.user.create({
+			const user = await authDb.user.create({
 				data: { email: 'existing@example.com', name: 'Existing User' },
 			})
 
 			const { hashOtpCode, getOtpExpiry } = await import('../lib/otp')
-			await db.otpCode.create({
+			await authDb.otpCode.create({
 				data: {
 					email: 'existing@example.com',
 					codeHash: hashOtpCode('123456'),
@@ -209,7 +209,7 @@ describe('AuthService', () => {
 
 		it('should return error for expired OTP', async () => {
 			const { hashOtpCode } = await import('../lib/otp')
-			await db.otpCode.create({
+			await authDb.otpCode.create({
 				data: {
 					email: 'test@example.com',
 					codeHash: hashOtpCode('123456'),
@@ -227,7 +227,7 @@ describe('AuthService', () => {
 	describe('refreshAccessToken', () => {
 		it('should return new tokens for valid refresh token', async () => {
 			// Skapa användare och session
-			const user = await db.user.create({
+			const user = await authDb.user.create({
 				data: { email: 'test@example.com' },
 			})
 
@@ -239,7 +239,7 @@ describe('AuthService', () => {
 				email: user.email,
 			})
 
-			const session = await db.session.create({
+			const session = await authDb.session.create({
 				data: {
 					userId: user.id,
 					refreshToken,
@@ -254,7 +254,7 @@ describe('AuthService', () => {
 			expect(result.newRefreshToken).toBeDefined()
 
 			// Verifiera att sessionen uppdaterades med ny refresh token
-			const updatedSession = await db.session.findUnique({
+			const updatedSession = await authDb.session.findUnique({
 				where: { id: session.id },
 			})
 			expect(updatedSession?.refreshToken).toBe(result.newRefreshToken)
@@ -271,11 +271,11 @@ describe('AuthService', () => {
 
 	describe('logout', () => {
 		it('should delete session', async () => {
-			const user = await db.user.create({
+			const user = await authDb.user.create({
 				data: { email: 'test@example.com' },
 			})
 
-			const session = await db.session.create({
+			const session = await authDb.session.create({
 				data: {
 					userId: user.id,
 					refreshToken: 'test-refresh-token',
@@ -285,7 +285,7 @@ describe('AuthService', () => {
 
 			await authService.logout('test-refresh-token')
 
-			const deletedSession = await db.session.findUnique({
+			const deletedSession = await authDb.session.findUnique({
 				where: { id: session.id },
 			})
 			expect(deletedSession).toBeNull()

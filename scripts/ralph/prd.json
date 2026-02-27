@@ -83,7 +83,7 @@
         "The application starts successfully in Docker with the new configuration"
       ],
       "priority": 6,
-      "passes": false
+      "passes": true
     }
   ]
 }
