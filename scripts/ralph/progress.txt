@@ -1,0 +1,59 @@
+# Ralph Progress Log
+Started: fre 27 feb 2026 21:55:43 CET
+
+## Codebase Patterns
+- Use local `node_modules/.bin/prisma` (v5.22) not global `npx prisma` (pulls v7 with breaking changes)
+- Tests need `DATABASE_URL` set before importing `db` - set env vars in `apps/api/src/test/setup.ts` before dynamic import
+- Generated Prisma clients go to `apps/api/src/generated/{auth,user}` - excluded from biome and gitignore
+- Original `prisma/schema.prisma` kept for backward compat while migration is in progress
+- Biome config at root `biome.json` - add generated directories to `files.ignore`
+- Test DB: `DATABASE_URL="file:./test.db"` with `prisma db push --skip-generate --accept-data-loss` before running tests
+- Auth DB: `authDb` singleton in `src/lib/auth-db.ts` using generated auth client
+- User DB: `getUserDb(userId)` factory in `src/lib/user-db.ts` with Map-based caching
+- `createUserDatabase(userId)` uses `prisma db push` to initialize per-user SQLite files
+- `import.meta.url` path resolution from `src/lib/`: go up 2 levels (`../..`) to reach `apps/api/`
+- Monorepo root prisma binary at `../../node_modules/.bin/prisma` relative to `apps/api/`
+
+---
+
+## 2026-02-27 22:00 - US-001
+- Implemented split Prisma schemas: central auth schema (User, OtpCode, Session) and per-user data schema (Project, TimeEntry without User FKs)
+- Central schema at `apps/api/prisma/central/schema.prisma` generates to `apps/api/src/generated/auth`
+- Per-user schema at `apps/api/prisma/user/schema.prisma` generates to `apps/api/src/generated/user`
+- Per-user schema uses `USER_DATABASE_URL` as placeholder datasource, overridden at runtime
+- Files changed:
+  - `apps/api/prisma/central/schema.prisma` (new)
+  - `apps/api/prisma/user/schema.prisma` (new)
+  - `apps/api/.env.example` (replaced DATABASE_URL with AUTH_DATABASE_URL and DATABASE_DIR)
+  - `apps/api/package.json` (added db:generate:auth, db:generate:user, db:generate:all, db:push:auth, db:push:user scripts)
+  - `apps/api/src/test/setup.ts` (set DATABASE_URL env var before db import)
+  - `biome.json` (ignore generated directory)
+  - `.gitignore` (ignore generated Prisma clients)
+- **Learnings for future iterations:**
+  - Global npx prisma pulls v7 which has breaking API changes - always use local binary at `node_modules/.bin/prisma`
+  - Tests had no .env file and relied on a local unversioned file - fixed by setting DATABASE_URL in test setup
+  - Need to set env vars BEFORE importing db module (use dynamic import after env setup)
+  - The per-user schema removes userId from Project/TimeEntry and changes unique constraint from `@@unique([projectId, userId, date])` to `@@unique([projectId, date])`
+  - Original schema.prisma kept for backward compat - existing db.ts and all services still use it until US-002+
+---
+
+## 2026-02-27 22:10 - US-002
+- Implemented per-user DB client factory with caching and central auth DB singleton
+- `getUserDb(userId)` returns cached PrismaClient connected to `DATABASE_DIR/<userId>.db`
+- `createUserDatabase(userId)` initializes new SQLite files via `prisma db push` on per-user schema
+- `authDb` singleton uses generated auth client from `src/generated/auth`
+- `disconnectAllUserDbs()` helper for cleanup/testing
+- Files changed:
+  - `apps/api/src/lib/auth-db.ts` (new) - Central auth DB singleton using generated auth client
+  - `apps/api/src/lib/user-db.ts` (new) - Per-user DB factory with Map-based caching
+  - `apps/api/src/lib/auth-db.test.ts` (new) - Tests for auth DB singleton
+  - `apps/api/src/lib/user-db.test.ts` (new) - Tests for getUserDb, createUserDatabase
+  - `apps/api/src/test/setup.ts` (modified) - Added AUTH_DATABASE_URL, USER_DATABASE_URL, DATABASE_DIR env vars
+  - `scripts/ralph/prd.json` (modified) - Marked US-002 as passes: true
+- **Learnings for future iterations:**
+  - `import.meta.url` in `src/lib/` -> go up 2 levels (`../..`) to reach `apps/api/`, not 3
+  - The local prisma binary is at the monorepo root `node_modules/.bin/prisma`, not in `apps/api/node_modules/.bin/`
+  - `PrismaClient` from generated clients accepts `datasourceUrl` option to override the schema-defined URL at runtime
+  - `prisma db push --skip-generate --accept-data-loss` is the right command for creating tables in new SQLite files
+  - Test setup must set `AUTH_DATABASE_URL` and `USER_DATABASE_URL` in addition to `DATABASE_URL` for the new generated clients
+---
