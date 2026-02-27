@@ -49,8 +49,8 @@ export class AuthService {
 			},
 		})
 
-		// Skicka kod (loggas till konsol i dev)
-		sendOtpEmail(normalizedEmail, code)
+		// Skicka kod via e-post (loggas till konsol i dev)
+		await sendOtpEmail(normalizedEmail, code)
 
 		return { success: true }
 	}

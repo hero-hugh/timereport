@@ -6,6 +6,9 @@ export default defineConfig({
 		environment: 'node',
 		include: ['src/**/*.test.ts'],
 		setupFiles: ['./src/test/setup.ts'],
+		env: {
+			DATABASE_URL: 'file:./test.db',
+		},
 		// Kör tester sekventiellt för att undvika databaskonflikter
 		pool: 'forks',
 		poolOptions: {

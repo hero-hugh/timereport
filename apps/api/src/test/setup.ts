@@ -2,6 +2,7 @@ import { afterAll, afterEach, beforeAll } from 'vitest'
 import { db } from '../lib/db'
 
 // Sätt test miljövariabler
+process.env.DATABASE_URL = 'file:./test.db'
 process.env.JWT_SECRET = 'test-secret-that-is-at-least-32-characters-long'
 process.env.JWT_REFRESH_SECRET = 'test-refresh-secret-at-least-32-characters'
 process.env.NODE_ENV = 'test'

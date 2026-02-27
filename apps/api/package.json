@@ -20,7 +20,8 @@
 		"@prisma/client": "^5.9.0",
 		"@time-report/shared": "*",
 		"hono": "^4.0.0",
-		"jose": "^5.2.0"
+		"jose": "^5.2.0",
+		"resend": "^6.9.2"
 	},
 	"devDependencies": {
 		"@types/node": "^20.11.0",
