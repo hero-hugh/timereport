@@ -16,8 +16,12 @@ Started: fre 27 feb 2026 21:55:43 CET
 - Use `vi.mock` with factory for module mocking in tests; use `vi.mocked(fn).mockRejectedValueOnce()` for async error simulation
 - `UserPrismaClient` type exported from `src/lib/user-db.ts` - use this type alias everywhere instead of importing directly from generated client
 - Auth middleware `requireAuth` sets both `user` and `userDb` on Hono context - use `getAuthUser(c)` and `getAuthUserDb(c)` helpers
-- Service methods accept `_userDb: UserPrismaClient` as first parameter (unused until US-005) - tests pass `db as unknown as UserPrismaClient`
+- Service methods accept `userDb: UserPrismaClient` as first parameter and use it for all DB operations; `_userId` param kept for API compat but unused in queries
 - Biome rejects `as any` casts - use `as unknown as TargetType` pattern instead
+- Per-user service tests use `testUserDb` from `src/test/test-user-db.ts` (real per-user PrismaClient connected to `test-user.db`)
+- Test setup pushes per-user schema to `test-user.db` in `beforeAll` and cleans both DBs in `afterEach`
+- Per-user schema has no `userId` on Project/TimeEntry - user isolation is at DB level, not query level
+- TimeEntry upsert compound key is `projectId_date` (not `projectId_userId_date`) in per-user schema
 
 ---
 
@@ -105,4 +109,30 @@ Started: fre 27 feb 2026 21:55:43 CET
   - Hono `res.json()` returns `unknown` type - cast with `as { ... }` for TypeScript strictness
   - The `_userDb` underscore prefix convention signals "intentionally unused parameter" to both developers and biome
   - Service method signature changes require updating both route handlers AND test files - plan for both when adding parameters
+---
+
+## 2026-02-27 22:40 - US-005
+- Switched all three data services (project, time-entry, report) from shared `db` singleton to per-user `userDb` parameter
+- Removed `userId` from all Prisma where clauses, create data, and aggregation queries (per-user DB is user-scoped)
+- Changed TimeEntry upsert compound key from `projectId_userId_date` to `projectId_date` (matches per-user schema)
+- Removed `import { db } from '../lib/db'` from all three service files
+- Renamed `_userDb` → `userDb` (now actively used) and `userId` → `_userId` (kept for API compat, unused in queries)
+- Created per-user test DB infrastructure: `test-user-db.ts` helper + schema push in `setup.ts` beforeAll
+- Updated service tests to use real `testUserDb` (per-user PrismaClient connected to `test-user.db`) instead of `db as unknown as UserPrismaClient` cast
+- Removed cross-user isolation tests (e.g., "should not delete other users entries") since user isolation is now at DB level
+- Files changed:
+  - `apps/api/src/services/project.service.ts` (modified) - Use userDb, remove userId from queries
+  - `apps/api/src/services/time-entry.service.ts` (modified) - Use userDb, remove userId, update upsert key
+  - `apps/api/src/services/report.service.ts` (modified) - Use userDb, remove userId from queries
+  - `apps/api/src/test/setup.ts` (modified) - Push per-user schema to test-user.db, clean both DBs
+  - `apps/api/src/test/test-user-db.ts` (new) - Singleton per-user PrismaClient for tests
+  - `apps/api/src/services/project.service.test.ts` (modified) - Use testUserDb, remove cross-user tests
+  - `apps/api/src/services/time-entry.service.test.ts` (modified) - Use testUserDb, remove cross-user tests
+- **Learnings for future iterations:**
+  - Per-user schema lacks `userId` on Project/TimeEntry - can't filter by userId, all data in the DB belongs to the user
+  - Test DB for per-user schema needs separate file (test-user.db) because test.db has NOT NULL userId columns from old schema
+  - `prisma db push` in `beforeAll` is fast (~1s) for small schemas - acceptable for test setup
+  - Cross-user isolation tests become meaningless with per-user DBs - DB-level isolation replaces query-level filtering
+  - Absolute paths for test DB URLs (via `import.meta.url` resolution) prevent path-resolution surprises across different Prisma schemas
+  - `testUserDb` global singleton pattern (via globalThis) ensures all test files share one connection
 ---
