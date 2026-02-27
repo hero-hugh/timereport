@@ -1,6 +1,10 @@
 import { beforeEach, describe, expect, it } from 'vitest'
 import { db } from '../lib/db'
+import type { UserPrismaClient } from '../lib/user-db'
 import { timeEntryService } from './time-entry.service'
+
+// Placeholder for per-user DB client (unused in service bodies until US-005)
+const userDb = db as unknown as UserPrismaClient
 
 describe('TimeEntryService', () => {
 	let testUserId: string
@@ -27,6 +31,7 @@ describe('TimeEntryService', () => {
 	describe('createOrUpdateTimeEntry', () => {
 		it('should create a new time entry', async () => {
 			const result = await timeEntryService.createOrUpdateTimeEntry(
+				userDb,
 				testUserId,
 				{
 					projectId: testProjectId,
@@ -43,7 +48,7 @@ describe('TimeEntryService', () => {
 
 		it('should update existing entry for same project/date', async () => {
 			// Skapa första entry
-			await timeEntryService.createOrUpdateTimeEntry(testUserId, {
+			await timeEntryService.createOrUpdateTimeEntry(userDb, testUserId, {
 				projectId: testProjectId,
 				date: '2024-01-15',
 				minutes: 60,
@@ -51,6 +56,7 @@ describe('TimeEntryService', () => {
 
 			// Uppdatera med ny tid
 			const result = await timeEntryService.createOrUpdateTimeEntry(
+				userDb,
 				testUserId,
 				{
 					projectId: testProjectId,
@@ -77,6 +83,7 @@ describe('TimeEntryService', () => {
 			})
 
 			const result = await timeEntryService.createOrUpdateTimeEntry(
+				userDb,
 				testUserId,
 				{
 					projectId: testProjectId,
@@ -91,6 +98,7 @@ describe('TimeEntryService', () => {
 
 		it('should return error for non-existent project', async () => {
 			const result = await timeEntryService.createOrUpdateTimeEntry(
+				userDb,
 				testUserId,
 				{
 					projectId: 'non-existent-id',
@@ -131,15 +139,23 @@ describe('TimeEntryService', () => {
 		})
 
 		it('should return all entries for user', async () => {
-			const entries = await timeEntryService.getTimeEntries(testUserId, {})
+			const entries = await timeEntryService.getTimeEntries(
+				userDb,
+				testUserId,
+				{},
+			)
 			expect(entries).toHaveLength(3)
 		})
 
 		it('should filter by date range', async () => {
-			const entries = await timeEntryService.getTimeEntries(testUserId, {
-				from: '2024-01-12',
-				to: '2024-01-18',
-			})
+			const entries = await timeEntryService.getTimeEntries(
+				userDb,
+				testUserId,
+				{
+					from: '2024-01-12',
+					to: '2024-01-18',
+				},
+			)
 			expect(entries).toHaveLength(1)
 			expect(entries[0].minutes).toBe(120)
 		})
@@ -164,16 +180,24 @@ describe('TimeEntryService', () => {
 				},
 			})
 
-			const entries = await timeEntryService.getTimeEntries(testUserId, {
-				projectId: testProjectId,
-			})
+			const entries = await timeEntryService.getTimeEntries(
+				userDb,
+				testUserId,
+				{
+					projectId: testProjectId,
+				},
+			)
 
 			expect(entries).toHaveLength(3)
 			expect(entries.every((e) => e.projectId === testProjectId)).toBe(true)
 		})
 
 		it('should include project info', async () => {
-			const entries = await timeEntryService.getTimeEntries(testUserId, {})
+			const entries = await timeEntryService.getTimeEntries(
+				userDb,
+				testUserId,
+				{},
+			)
 
 			expect(entries[0].project).toBeDefined()
 			expect(entries[0].project.name).toBe('Test Project')
@@ -208,6 +232,7 @@ describe('TimeEntryService', () => {
 
 			const weekStart = new Date('2024-01-15')
 			const entries = await timeEntryService.getWeekEntries(
+				userDb,
 				testUserId,
 				weekStart,
 			)
@@ -228,6 +253,7 @@ describe('TimeEntryService', () => {
 			})
 
 			const result = await timeEntryService.deleteTimeEntry(
+				userDb,
 				entry.id,
 				testUserId,
 			)
@@ -241,6 +267,7 @@ describe('TimeEntryService', () => {
 
 		it('should return false for non-existent entry', async () => {
 			const result = await timeEntryService.deleteTimeEntry(
+				userDb,
 				'non-existent-id',
 				testUserId,
 			)
@@ -262,6 +289,7 @@ describe('TimeEntryService', () => {
 			})
 
 			const result = await timeEntryService.deleteTimeEntry(
+				userDb,
 				entry.id,
 				otherUser.id,
 			)

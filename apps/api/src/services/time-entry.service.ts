@@ -4,12 +4,17 @@ import type {
 	UpdateTimeEntryInput,
 } from '@time-report/shared'
 import { db } from '../lib/db'
+import type { UserPrismaClient } from '../lib/user-db'
 
 export class TimeEntryService {
 	/**
 	 * Hämta tidrapporter med filter
 	 */
-	async getTimeEntries(userId: string, query: TimeEntriesQuery) {
+	async getTimeEntries(
+		_userDb: UserPrismaClient,
+		userId: string,
+		query: TimeEntriesQuery,
+	) {
 		const where: {
 			userId: string
 			projectId?: string
@@ -48,7 +53,11 @@ export class TimeEntryService {
 	/**
 	 * Hämta tidrapport per ID
 	 */
-	async getTimeEntry(entryId: string, userId: string) {
+	async getTimeEntry(
+		_userDb: UserPrismaClient,
+		entryId: string,
+		userId: string,
+	) {
 		return db.timeEntry.findFirst({
 			where: { id: entryId, userId },
 			include: {
@@ -66,7 +75,11 @@ export class TimeEntryService {
 	/**
 	 * Skapa eller uppdatera tidrapport (upsert baserat på projekt + datum)
 	 */
-	async createOrUpdateTimeEntry(userId: string, data: CreateTimeEntryInput) {
+	async createOrUpdateTimeEntry(
+		_userDb: UserPrismaClient,
+		userId: string,
+		data: CreateTimeEntryInput,
+	) {
 		// Verifiera att projektet tillhör användaren och är aktivt
 		const project = await db.project.findFirst({
 			where: {
@@ -127,6 +140,7 @@ export class TimeEntryService {
 	 * Uppdatera tidrapport
 	 */
 	async updateTimeEntry(
+		_userDb: UserPrismaClient,
 		entryId: string,
 		userId: string,
 		data: UpdateTimeEntryInput,
@@ -166,7 +180,11 @@ export class TimeEntryService {
 	/**
 	 * Ta bort tidrapport
 	 */
-	async deleteTimeEntry(entryId: string, userId: string) {
+	async deleteTimeEntry(
+		_userDb: UserPrismaClient,
+		entryId: string,
+		userId: string,
+	) {
 		const entry = await db.timeEntry.findFirst({
 			where: { id: entryId, userId },
 		})
@@ -183,7 +201,11 @@ export class TimeEntryService {
 	/**
 	 * Hämta tidrapporter för en vecka
 	 */
-	async getWeekEntries(userId: string, weekStart: Date) {
+	async getWeekEntries(
+		_userDb: UserPrismaClient,
+		userId: string,
+		weekStart: Date,
+	) {
 		const weekEnd = new Date(weekStart)
 		weekEnd.setDate(weekEnd.getDate() + 6)
 		// Set to end of day to include all entries on the last day

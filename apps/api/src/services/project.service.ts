@@ -3,12 +3,17 @@ import type {
 	UpdateProjectInput,
 } from '@time-report/shared'
 import { db } from '../lib/db'
+import type { UserPrismaClient } from '../lib/user-db'
 
 export class ProjectService {
 	/**
 	 * Hämta alla projekt för en användare
 	 */
-	async getProjects(userId: string, includeInactive = false) {
+	async getProjects(
+		_userDb: UserPrismaClient,
+		userId: string,
+		includeInactive = false,
+	) {
 		const projects = await db.project.findMany({
 			where: {
 				userId,
@@ -44,7 +49,11 @@ export class ProjectService {
 	/**
 	 * Hämta ett specifikt projekt
 	 */
-	async getProject(projectId: string, userId: string) {
+	async getProject(
+		_userDb: UserPrismaClient,
+		projectId: string,
+		userId: string,
+	) {
 		const project = await db.project.findFirst({
 			where: { id: projectId, userId },
 		})
@@ -71,7 +80,11 @@ export class ProjectService {
 	/**
 	 * Skapa nytt projekt
 	 */
-	async createProject(userId: string, data: CreateProjectInput) {
+	async createProject(
+		_userDb: UserPrismaClient,
+		userId: string,
+		data: CreateProjectInput,
+	) {
 		return db.project.create({
 			data: {
 				userId,
@@ -88,6 +101,7 @@ export class ProjectService {
 	 * Uppdatera projekt
 	 */
 	async updateProject(
+		_userDb: UserPrismaClient,
 		projectId: string,
 		userId: string,
 		data: UpdateProjectInput,
@@ -121,7 +135,11 @@ export class ProjectService {
 	/**
 	 * Ta bort projekt
 	 */
-	async deleteProject(projectId: string, userId: string) {
+	async deleteProject(
+		_userDb: UserPrismaClient,
+		projectId: string,
+		userId: string,
+	) {
 		// Verifiera att projektet tillhör användaren
 		const project = await db.project.findFirst({
 			where: { id: projectId, userId },

@@ -1,12 +1,17 @@
 import type { ReportQuery } from '@time-report/shared'
 import { db } from '../lib/db'
 import { isRedDay } from '../lib/swedish-holidays'
+import type { UserPrismaClient } from '../lib/user-db'
 
 export class ReportService {
 	/**
 	 * Hämta sammanställning av tid och belopp
 	 */
-	async getSummary(userId: string, query: ReportQuery) {
+	async getSummary(
+		_userDb: UserPrismaClient,
+		userId: string,
+		query: ReportQuery,
+	) {
 		const fromDate = new Date(query.from)
 		const toDate = new Date(query.to)
 
@@ -94,7 +99,7 @@ export class ReportService {
 	/**
 	 * Hämta översikt för dashboard
 	 */
-	async getDashboardStats(userId: string) {
+	async getDashboardStats(_userDb: UserPrismaClient, userId: string) {
 		const now = new Date()
 
 		// Denna vecka (måndag till söndag)

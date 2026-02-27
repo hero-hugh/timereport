@@ -54,7 +54,7 @@
         "Unauthenticated routes (OTP request, OTP verify, refresh) continue using only the central auth DB"
       ],
       "priority": 4,
-      "passes": false
+      "passes": true
     },
     {
       "id": "US-005",

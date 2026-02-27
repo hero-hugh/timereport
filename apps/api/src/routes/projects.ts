@@ -1,6 +1,6 @@
 import { createProjectSchema, updateProjectSchema } from '@time-report/shared'
 import { Hono } from 'hono'
-import { getAuthUser, requireAuth } from '../middleware/auth'
+import { getAuthUser, getAuthUserDb, requireAuth } from '../middleware/auth'
 import { projectService } from '../services/project.service'
 
 const projects = new Hono()
@@ -14,9 +14,14 @@ projects.use('*', requireAuth)
  */
 projects.get('/', async (c) => {
 	const { userId } = getAuthUser(c)
+	const userDb = getAuthUserDb(c)
 	const includeInactive = c.req.query('includeInactive') === 'true'
 
-	const projectList = await projectService.getProjects(userId, includeInactive)
+	const projectList = await projectService.getProjects(
+		userDb,
+		userId,
+		includeInactive,
+	)
 
 	return c.json({ success: true, data: projectList })
 })
@@ -27,9 +32,10 @@ projects.get('/', async (c) => {
  */
 projects.get('/:id', async (c) => {
 	const { userId } = getAuthUser(c)
+	const userDb = getAuthUserDb(c)
 	const projectId = c.req.param('id')
 
-	const project = await projectService.getProject(projectId, userId)
+	const project = await projectService.getProject(userDb, projectId, userId)
 
 	if (!project) {
 		return c.json({ success: false, error: 'Projektet hittades inte' }, 404)
@@ -44,6 +50,7 @@ projects.get('/:id', async (c) => {
  */
 projects.post('/', async (c) => {
 	const { userId } = getAuthUser(c)
+	const userDb = getAuthUserDb(c)
 	const body = await c.req.json()
 
 	const parsed = createProjectSchema.safeParse(body)
@@ -57,7 +64,11 @@ projects.post('/', async (c) => {
 		)
 	}
 
-	const project = await projectService.createProject(userId, parsed.data)
+	const project = await projectService.createProject(
+		userDb,
+		userId,
+		parsed.data,
+	)
 
 	return c.json({ success: true, data: project }, 201)
 })
@@ -68,6 +79,7 @@ projects.post('/', async (c) => {
  */
 projects.patch('/:id', async (c) => {
 	const { userId } = getAuthUser(c)
+	const userDb = getAuthUserDb(c)
 	const projectId = c.req.param('id')
 	const body = await c.req.json()
 
@@ -83,6 +95,7 @@ projects.patch('/:id', async (c) => {
 	}
 
 	const project = await projectService.updateProject(
+		userDb,
 		projectId,
 		userId,
 		parsed.data,
@@ -101,9 +114,10 @@ projects.patch('/:id', async (c) => {
  */
 projects.delete('/:id', async (c) => {
 	const { userId } = getAuthUser(c)
+	const userDb = getAuthUserDb(c)
 	const projectId = c.req.param('id')
 
-	const deleted = await projectService.deleteProject(projectId, userId)
+	const deleted = await projectService.deleteProject(userDb, projectId, userId)
 
 	if (!deleted) {
 		return c.json({ success: false, error: 'Projektet hittades inte' }, 404)

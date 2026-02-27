@@ -3,6 +3,8 @@ import fs from 'node:fs'
 import path from 'node:path'
 import { PrismaClient } from '../generated/user/index.js'
 
+export type UserPrismaClient = PrismaClient
+
 const userDbCache = new Map<string, PrismaClient>()
 
 function getDatabaseDir(): string {
