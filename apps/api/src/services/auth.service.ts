@@ -14,6 +14,7 @@ import {
 	sendOtpEmail,
 	verifyOtpCode,
 } from '../lib/otp'
+import { createUserDatabase } from '../lib/user-db'
 
 export class AuthService {
 	/**
@@ -148,6 +149,22 @@ export class AuthService {
 			user = await db.user.create({
 				data: { email: normalizedEmail },
 			})
+
+			// Create per-user database file for the new user
+			try {
+				await createUserDatabase(user.id)
+			} catch (error) {
+				// Rollback: delete the user from the central DB
+				await db.user.delete({ where: { id: user.id } })
+				console.error(
+					`[AUTH] Failed to create user database for ${user.id}:`,
+					error,
+				)
+				return {
+					success: false,
+					error: 'Kunde inte skapa användardatabas',
+				}
+			}
 		}
 
 		// Skapa tokens

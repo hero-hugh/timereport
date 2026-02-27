@@ -1,6 +1,12 @@
-import { beforeEach, describe, expect, it } from 'vitest'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { db } from '../lib/db'
 import { authService } from './auth.service'
+
+vi.mock('../lib/user-db', () => ({
+	createUserDatabase: vi.fn(),
+	getUserDb: vi.fn(),
+	disconnectAllUserDbs: vi.fn(),
+}))
 
 describe('AuthService', () => {
 	describe('requestOtp', () => {
@@ -87,6 +93,7 @@ describe('AuthService', () => {
 		})
 
 		it('should create user and return tokens for correct code', async () => {
+			const { createUserDatabase } = await import('../lib/user-db')
 			const { hashOtpCode, getOtpExpiry } = await import('../lib/otp')
 			await db.otpCode.create({
 				data: {
@@ -111,6 +118,68 @@ describe('AuthService', () => {
 				where: { email: 'newuser@example.com' },
 			})
 			expect(user).not.toBeNull()
+
+			// Verify per-user database was created
+			expect(createUserDatabase).toHaveBeenCalledWith(user?.id)
+		})
+
+		it('should rollback user creation if per-user DB creation fails', async () => {
+			const { createUserDatabase } = await import('../lib/user-db')
+			vi.mocked(createUserDatabase).mockRejectedValueOnce(
+				new Error('DB creation failed'),
+			)
+
+			const { hashOtpCode, getOtpExpiry } = await import('../lib/otp')
+			await db.otpCode.create({
+				data: {
+					email: 'failuser@example.com',
+					codeHash: hashOtpCode('123456'),
+					expiresAt: getOtpExpiry(),
+				},
+			})
+
+			const result = await authService.verifyOtp(
+				'failuser@example.com',
+				'123456',
+			)
+
+			expect(result.success).toBe(false)
+			expect(result.error).toBe('Kunde inte skapa användardatabas')
+
+			// Verify user was rolled back (deleted from central DB)
+			const user = await db.user.findUnique({
+				where: { email: 'failuser@example.com' },
+			})
+			expect(user).toBeNull()
+		})
+
+		it('should not create per-user DB for existing user', async () => {
+			const { createUserDatabase } = await import('../lib/user-db')
+			vi.mocked(createUserDatabase).mockClear()
+
+			const { hashOtpCode, getOtpExpiry } = await import('../lib/otp')
+
+			// Create existing user first
+			await db.user.create({
+				data: { email: 'existing-db@example.com' },
+			})
+
+			await db.otpCode.create({
+				data: {
+					email: 'existing-db@example.com',
+					codeHash: hashOtpCode('123456'),
+					expiresAt: getOtpExpiry(),
+				},
+			})
+
+			const result = await authService.verifyOtp(
+				'existing-db@example.com',
+				'123456',
+			)
+
+			expect(result.success).toBe(true)
+			// createUserDatabase should NOT be called for existing users
+			expect(createUserDatabase).not.toHaveBeenCalled()
 		})
 
 		it('should login existing user', async () => {
