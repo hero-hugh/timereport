@@ -1,6 +1,6 @@
 import { reportQuerySchema } from '@time-report/shared'
 import { Hono } from 'hono'
-import { getAuthUser, requireAuth } from '../middleware/auth'
+import { getAuthUser, getAuthUserDb, requireAuth } from '../middleware/auth'
 import { reportService } from '../services/report.service'
 
 const reports = new Hono()
@@ -14,6 +14,7 @@ reports.use('*', requireAuth)
  */
 reports.get('/summary', async (c) => {
 	const { userId } = getAuthUser(c)
+	const userDb = getAuthUserDb(c)
 
 	const query = {
 		projectId: c.req.query('projectId'),
@@ -32,7 +33,7 @@ reports.get('/summary', async (c) => {
 		)
 	}
 
-	const summary = await reportService.getSummary(userId, parsed.data)
+	const summary = await reportService.getSummary(userDb, userId, parsed.data)
 
 	return c.json({ success: true, data: summary })
 })
@@ -43,8 +44,9 @@ reports.get('/summary', async (c) => {
  */
 reports.get('/dashboard', async (c) => {
 	const { userId } = getAuthUser(c)
+	const userDb = getAuthUserDb(c)
 
-	const stats = await reportService.getDashboardStats(userId)
+	const stats = await reportService.getDashboardStats(userDb, userId)
 
 	return c.json({ success: true, data: stats })
 })

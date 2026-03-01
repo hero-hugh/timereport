@@ -1,4 +1,4 @@
-import { db } from '../lib/db'
+import { authDb } from '../lib/auth-db'
 import {
 	createAccessToken,
 	createRefreshToken,
@@ -14,6 +14,7 @@ import {
 	sendOtpEmail,
 	verifyOtpCode,
 } from '../lib/otp'
+import { createUserDatabase } from '../lib/user-db'
 
 export class AuthService {
 	/**
@@ -25,7 +26,7 @@ export class AuthService {
 		const normalizedEmail = email.toLowerCase().trim()
 
 		// Invalidera gamla, oanvända koder för denna e-post
-		await db.otpCode.updateMany({
+		await authDb.otpCode.updateMany({
 			where: {
 				email: normalizedEmail,
 				used: false,
@@ -41,7 +42,7 @@ export class AuthService {
 		const expiresAt = getOtpExpiry()
 
 		// Spara i databas
-		await db.otpCode.create({
+		await authDb.otpCode.create({
 			data: {
 				email: normalizedEmail,
 				codeHash,
@@ -75,7 +76,7 @@ export class AuthService {
 		)
 
 		// Hitta senaste oanvända koden för denna e-post
-		const otpRecord = await db.otpCode.findFirst({
+		const otpRecord = await authDb.otpCode.findFirst({
 			where: {
 				email: normalizedEmail,
 				used: false,
@@ -103,7 +104,7 @@ export class AuthService {
 
 		// Kolla om utgången
 		if (isOtpExpired(otpRecord.expiresAt)) {
-			await db.otpCode.update({
+			await authDb.otpCode.update({
 				where: { id: otpRecord.id },
 				data: { used: true },
 			})
@@ -112,7 +113,7 @@ export class AuthService {
 
 		// Kolla max försök
 		if (hasExceededMaxAttempts(otpRecord.attempts)) {
-			await db.otpCode.update({
+			await authDb.otpCode.update({
 				where: { id: otpRecord.id },
 				data: { used: true },
 			})
@@ -126,7 +127,7 @@ export class AuthService {
 		)
 
 		if (!codeMatches) {
-			await db.otpCode.update({
+			await authDb.otpCode.update({
 				where: { id: otpRecord.id },
 				data: { attempts: otpRecord.attempts + 1 },
 			})
@@ -134,20 +135,36 @@ export class AuthService {
 		}
 
 		// Markera koden som använd
-		await db.otpCode.update({
+		await authDb.otpCode.update({
 			where: { id: otpRecord.id },
 			data: { used: true },
 		})
 
 		// Hitta eller skapa användare
-		let user = await db.user.findUnique({
+		let user = await authDb.user.findUnique({
 			where: { email: normalizedEmail },
 		})
 
 		if (!user) {
-			user = await db.user.create({
+			user = await authDb.user.create({
 				data: { email: normalizedEmail },
 			})
+
+			// Create per-user database file for the new user
+			try {
+				await createUserDatabase(user.id)
+			} catch (error) {
+				// Rollback: delete the user from the central DB
+				await authDb.user.delete({ where: { id: user.id } })
+				console.error(
+					`[AUTH] Failed to create user database for ${user.id}:`,
+					error,
+				)
+				return {
+					success: false,
+					error: 'Kunde inte skapa användardatabas',
+				}
+			}
 		}
 
 		// Skapa tokens
@@ -156,7 +173,7 @@ export class AuthService {
 		const refreshToken = await createRefreshToken(tokenPayload)
 
 		// Spara refresh token i databas
-		await db.session.create({
+		await authDb.session.create({
 			data: {
 				userId: user.id,
 				refreshToken,
@@ -192,7 +209,7 @@ export class AuthService {
 		}
 
 		// Hitta session i databas
-		const session = await db.session.findUnique({
+		const session = await authDb.session.findUnique({
 			where: { refreshToken },
 			include: { user: true },
 		})
@@ -202,7 +219,7 @@ export class AuthService {
 		}
 
 		if (new Date() > session.expiresAt) {
-			await db.session.delete({ where: { id: session.id } })
+			await authDb.session.delete({ where: { id: session.id } })
 			return { success: false, error: 'Session har gått ut' }
 		}
 
@@ -212,7 +229,7 @@ export class AuthService {
 		const newRefreshToken = await createRefreshToken(tokenPayload)
 
 		// Uppdatera session med ny refresh token
-		await db.session.update({
+		await authDb.session.update({
 			where: { id: session.id },
 			data: {
 				refreshToken: newRefreshToken,
@@ -231,7 +248,7 @@ export class AuthService {
 	 * Logga ut - ta bort session
 	 */
 	async logout(refreshToken: string): Promise<void> {
-		await db.session.deleteMany({
+		await authDb.session.deleteMany({
 			where: { refreshToken },
 		})
 	}
@@ -240,7 +257,7 @@ export class AuthService {
 	 * Logga ut från alla enheter
 	 */
 	async logoutAll(userId: string): Promise<void> {
-		await db.session.deleteMany({
+		await authDb.session.deleteMany({
 			where: { userId },
 		})
 	}
@@ -249,7 +266,7 @@ export class AuthService {
 	 * Hämta användare med ID
 	 */
 	async getUserById(userId: string) {
-		return db.user.findUnique({
+		return authDb.user.findUnique({
 			where: { id: userId },
 			select: {
 				id: true,

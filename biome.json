@@ -33,7 +33,8 @@
 			".turbo",
 			"*.db",
 			"apps/web/src/components/ui",
-			"**/tsconfig*.json"
+			"**/tsconfig*.json",
+			"apps/api/src/generated"
 		]
 	}
 }

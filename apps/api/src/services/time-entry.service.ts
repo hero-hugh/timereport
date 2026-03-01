@@ -3,18 +3,21 @@ import type {
 	TimeEntriesQuery,
 	UpdateTimeEntryInput,
 } from '@time-report/shared'
-import { db } from '../lib/db'
+import type { UserPrismaClient } from '../lib/user-db'
 
 export class TimeEntryService {
 	/**
 	 * Hämta tidrapporter med filter
 	 */
-	async getTimeEntries(userId: string, query: TimeEntriesQuery) {
+	async getTimeEntries(
+		userDb: UserPrismaClient,
+		_userId: string,
+		query: TimeEntriesQuery,
+	) {
 		const where: {
-			userId: string
 			projectId?: string
 			date?: { gte?: Date; lte?: Date }
-		} = { userId }
+		} = {}
 
 		if (query.projectId) {
 			where.projectId = query.projectId
@@ -30,7 +33,7 @@ export class TimeEntryService {
 			}
 		}
 
-		return db.timeEntry.findMany({
+		return userDb.timeEntry.findMany({
 			where,
 			include: {
 				project: {
@@ -48,9 +51,13 @@ export class TimeEntryService {
 	/**
 	 * Hämta tidrapport per ID
 	 */
-	async getTimeEntry(entryId: string, userId: string) {
-		return db.timeEntry.findFirst({
-			where: { id: entryId, userId },
+	async getTimeEntry(
+		userDb: UserPrismaClient,
+		entryId: string,
+		_userId: string,
+	) {
+		return userDb.timeEntry.findFirst({
+			where: { id: entryId },
 			include: {
 				project: {
 					select: {
@@ -66,12 +73,15 @@ export class TimeEntryService {
 	/**
 	 * Skapa eller uppdatera tidrapport (upsert baserat på projekt + datum)
 	 */
-	async createOrUpdateTimeEntry(userId: string, data: CreateTimeEntryInput) {
-		// Verifiera att projektet tillhör användaren och är aktivt
-		const project = await db.project.findFirst({
+	async createOrUpdateTimeEntry(
+		userDb: UserPrismaClient,
+		_userId: string,
+		data: CreateTimeEntryInput,
+	) {
+		// Verifiera att projektet är aktivt
+		const project = await userDb.project.findFirst({
 			where: {
 				id: data.projectId,
-				userId,
 				isActive: true,
 			},
 		})
@@ -90,17 +100,15 @@ export class TimeEntryService {
 		)
 
 		// Upsert - skapa eller uppdatera befintlig entry
-		const entry = await db.timeEntry.upsert({
+		const entry = await userDb.timeEntry.upsert({
 			where: {
-				projectId_userId_date: {
+				projectId_date: {
 					projectId: data.projectId,
-					userId,
 					date,
 				},
 			},
 			create: {
 				projectId: data.projectId,
-				userId,
 				date,
 				minutes: data.minutes,
 				description: data.description,
@@ -127,20 +135,20 @@ export class TimeEntryService {
 	 * Uppdatera tidrapport
 	 */
 	async updateTimeEntry(
+		userDb: UserPrismaClient,
 		entryId: string,
-		userId: string,
+		_userId: string,
 		data: UpdateTimeEntryInput,
 	) {
-		// Verifiera att entry tillhör användaren
-		const entry = await db.timeEntry.findFirst({
-			where: { id: entryId, userId },
+		const entry = await userDb.timeEntry.findFirst({
+			where: { id: entryId },
 		})
 
 		if (!entry) {
 			return { success: false, error: 'Tidrapport hittades inte' }
 		}
 
-		const updated = await db.timeEntry.update({
+		const updated = await userDb.timeEntry.update({
 			where: { id: entryId },
 			data: {
 				...(data.date !== undefined && { date: new Date(data.date) }),
@@ -166,14 +174,18 @@ export class TimeEntryService {
 	/**
 	 * Ta bort tidrapport
 	 */
-	async deleteTimeEntry(entryId: string, userId: string) {
-		const entry = await db.timeEntry.findFirst({
-			where: { id: entryId, userId },
+	async deleteTimeEntry(
+		userDb: UserPrismaClient,
+		entryId: string,
+		_userId: string,
+	) {
+		const entry = await userDb.timeEntry.findFirst({
+			where: { id: entryId },
 		})
 
 		if (!entry) return false
 
-		await db.timeEntry.delete({
+		await userDb.timeEntry.delete({
 			where: { id: entryId },
 		})
 
@@ -183,19 +195,22 @@ export class TimeEntryService {
 	/**
 	 * Hämta tidrapporter för en vecka
 	 */
-	async getWeekEntries(userId: string, weekStart: Date) {
+	async getWeekEntries(
+		userDb: UserPrismaClient,
+		_userId: string,
+		weekStart: Date,
+	) {
 		const weekEnd = new Date(weekStart)
 		weekEnd.setDate(weekEnd.getDate() + 6)
 		// Set to end of day to include all entries on the last day
 		weekEnd.setHours(23, 59, 59, 999)
 
 		console.log(
-			`[TIME-ENTRY] getWeekEntries: userId=${userId}, weekStart=${weekStart.toISOString()}, weekEnd=${weekEnd.toISOString()}`,
+			`[TIME-ENTRY] getWeekEntries: weekStart=${weekStart.toISOString()}, weekEnd=${weekEnd.toISOString()}`,
 		)
 
-		const entries = await db.timeEntry.findMany({
+		const entries = await userDb.timeEntry.findMany({
 			where: {
-				userId,
 				date: {
 					gte: weekStart,
 					lte: weekEnd,

@@ -1,0 +1,39 @@
+generator client {
+  provider      = "prisma-client-js"
+  output        = "../../src/generated/user"
+  binaryTargets = ["native", "linux-musl-openssl-3.0.x"]
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("USER_DATABASE_URL")
+}
+
+model Project {
+  id          String    @id @default(uuid())
+  name        String
+  description String?
+  hourlyRate  Int? // I ören (t.ex. 85000 = 850 kr)
+  startDate   DateTime
+  endDate     DateTime? // null = tills vidare
+  isActive    Boolean   @default(true)
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  timeEntries TimeEntry[]
+}
+
+model TimeEntry {
+  id          String   @id @default(uuid())
+  projectId   String
+  date        DateTime // Endast datum
+  minutes     Int // Tid i minuter
+  description String? // Valfri kommentar
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@unique([projectId, date])
+  @@index([projectId])
+}
