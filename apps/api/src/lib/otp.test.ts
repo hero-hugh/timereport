@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import {
 	OTP_CONFIG,
 	generateOtpCode,
@@ -6,8 +6,13 @@ import {
 	hasExceededMaxAttempts,
 	hashOtpCode,
 	isOtpExpired,
+	sendOtpEmail,
 	verifyOtpCode,
 } from './otp'
+
+vi.mock('./email', () => ({
+	sendLoginCodeEmail: vi.fn().mockResolvedValue(undefined),
+}))
 
 describe('OTP utilities', () => {
 	describe('generateOtpCode', () => {
@@ -90,6 +95,46 @@ describe('OTP utilities', () => {
 		it('should return true for attempts at or above max', () => {
 			expect(hasExceededMaxAttempts(5)).toBe(true)
 			expect(hasExceededMaxAttempts(10)).toBe(true)
+		})
+	})
+
+	describe('sendOtpEmail', () => {
+		const originalEnv = process.env.NODE_ENV
+
+		afterEach(() => {
+			process.env.NODE_ENV = originalEnv
+		})
+
+		it('should log to console in development mode', async () => {
+			process.env.NODE_ENV = 'development'
+			const consoleSpy = vi.spyOn(console, 'log').mockImplementation(() => {})
+
+			await sendOtpEmail('test@example.com', '123456')
+
+			expect(consoleSpy).toHaveBeenCalledWith(expect.stringContaining('123456'))
+			consoleSpy.mockRestore()
+		})
+
+		it('should log to console in test mode', async () => {
+			process.env.NODE_ENV = 'test'
+			const consoleSpy = vi.spyOn(console, 'log').mockImplementation(() => {})
+
+			await sendOtpEmail('test@example.com', '654321')
+
+			expect(consoleSpy).toHaveBeenCalledWith(expect.stringContaining('654321'))
+			consoleSpy.mockRestore()
+		})
+
+		it('should call sendLoginCodeEmail in production mode', async () => {
+			process.env.NODE_ENV = 'production'
+			const { sendLoginCodeEmail } = await import('./email')
+
+			await sendOtpEmail('test@example.com', '123456')
+
+			expect(sendLoginCodeEmail).toHaveBeenCalledWith(
+				'test@example.com',
+				'123456',
+			)
 		})
 	})
 })

@@ -1,4 +1,5 @@
 import { createHash, randomInt } from 'node:crypto'
+import { sendLoginCodeEmail } from './email'
 
 const OTP_LENGTH = 6
 const OTP_EXPIRY_MINUTES = 10
@@ -49,10 +50,9 @@ export function hasExceededMaxAttempts(attempts: number): boolean {
 }
 
 /**
- * Skicka OTP via e-post (för tillfället: logga till konsol)
+ * Logga OTP-kod till konsol (utvecklingsläge)
  */
-export function sendOtpEmail(email: string, code: string): void {
-	// TODO: Implementera riktig e-postutskickning
+function logOtpToConsole(email: string, code: string): void {
 	console.log(`\n${'='.repeat(50)}`)
 	console.log('OTP-KOD FÖR INLOGGNING')
 	console.log('='.repeat(50))
@@ -60,6 +60,23 @@ export function sendOtpEmail(email: string, code: string): void {
 	console.log(`Kod: ${code}`)
 	console.log(`Giltig i: ${OTP_EXPIRY_MINUTES} minuter`)
 	console.log(`${'='.repeat(50)}\n`)
+}
+
+/**
+ * Skicka OTP via e-post med Resend, eller logga till konsol i utvecklingsläge
+ */
+export async function sendOtpEmail(email: string, code: string): Promise<void> {
+	const isDev =
+		!process.env.NODE_ENV ||
+		process.env.NODE_ENV === 'development' ||
+		process.env.NODE_ENV === 'test'
+
+	if (isDev) {
+		logOtpToConsole(email, code)
+		return
+	}
+
+	await sendLoginCodeEmail(email, code)
 }
 
 export const OTP_CONFIG = {
