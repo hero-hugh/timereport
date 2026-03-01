@@ -1,22 +1,24 @@
 import type { ReportQuery } from '@time-report/shared'
-import { db } from '../lib/db'
 import { isRedDay } from '../lib/swedish-holidays'
+import type { UserPrismaClient } from '../lib/user-db'
 
 export class ReportService {
 	/**
 	 * Hämta sammanställning av tid och belopp
 	 */
-	async getSummary(userId: string, query: ReportQuery) {
+	async getSummary(
+		userDb: UserPrismaClient,
+		_userId: string,
+		query: ReportQuery,
+	) {
 		const fromDate = new Date(query.from)
 		const toDate = new Date(query.to)
 
 		// Bygg where-clause
 		const where: {
-			userId: string
 			projectId?: string
 			date: { gte: Date; lte: Date }
 		} = {
-			userId,
 			date: {
 				gte: fromDate,
 				lte: toDate,
@@ -28,7 +30,7 @@ export class ReportService {
 		}
 
 		// Hämta alla tidrapporter med projektinfo
-		const entries = await db.timeEntry.findMany({
+		const entries = await userDb.timeEntry.findMany({
 			where,
 			include: {
 				project: {
@@ -94,7 +96,7 @@ export class ReportService {
 	/**
 	 * Hämta översikt för dashboard
 	 */
-	async getDashboardStats(userId: string) {
+	async getDashboardStats(userDb: UserPrismaClient, _userId: string) {
 		const now = new Date()
 
 		// Denna vecka (måndag till söndag)
@@ -115,25 +117,22 @@ export class ReportService {
 		// Hämta statistik
 		const [weekStats, monthStats, activeProjects, recentEntries] =
 			await Promise.all([
-				db.timeEntry.aggregate({
+				userDb.timeEntry.aggregate({
 					where: {
-						userId,
 						date: { gte: weekStart, lte: weekEnd },
 					},
 					_sum: { minutes: true },
 				}),
-				db.timeEntry.aggregate({
+				userDb.timeEntry.aggregate({
 					where: {
-						userId,
 						date: { gte: monthStart, lte: monthEnd },
 					},
 					_sum: { minutes: true },
 				}),
-				db.project.count({
-					where: { userId, isActive: true },
+				userDb.project.count({
+					where: { isActive: true },
 				}),
-				db.timeEntry.findMany({
-					where: { userId },
+				userDb.timeEntry.findMany({
 					include: {
 						project: {
 							select: { id: true, name: true },

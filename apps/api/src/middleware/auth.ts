@@ -1,6 +1,7 @@
 import type { Context, Next } from 'hono'
 import { getCookie } from 'hono/cookie'
 import { verifyAccessToken } from '../lib/jwt'
+import { type UserPrismaClient, getUserDb } from '../lib/user-db'
 
 export interface AuthUser {
 	userId: string
@@ -36,6 +37,10 @@ export async function requireAuth(c: Context, next: Next) {
 	// Sätt användare på context
 	c.set('user', payload)
 
+	// Resolve and attach the per-user DB client
+	const userDb = getUserDb(payload.userId)
+	c.set('userDb', userDb)
+
 	await next()
 }
 
@@ -44,4 +49,11 @@ export async function requireAuth(c: Context, next: Next) {
  */
 export function getAuthUser(c: Context): AuthUser {
 	return c.get('user') as AuthUser
+}
+
+/**
+ * Hämta per-user DB client från context
+ */
+export function getAuthUserDb(c: Context): UserPrismaClient {
+	return c.get('userDb') as UserPrismaClient
 }

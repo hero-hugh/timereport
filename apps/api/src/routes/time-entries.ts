@@ -4,7 +4,7 @@ import {
 	updateTimeEntrySchema,
 } from '@time-report/shared'
 import { Hono } from 'hono'
-import { getAuthUser, requireAuth } from '../middleware/auth'
+import { getAuthUser, getAuthUserDb, requireAuth } from '../middleware/auth'
 import { timeEntryService } from '../services/time-entry.service'
 
 const timeEntries = new Hono()
@@ -18,6 +18,7 @@ timeEntries.use('*', requireAuth)
  */
 timeEntries.get('/', async (c) => {
 	const { userId } = getAuthUser(c)
+	const userDb = getAuthUserDb(c)
 
 	const query = {
 		projectId: c.req.query('projectId'),
@@ -36,7 +37,11 @@ timeEntries.get('/', async (c) => {
 		)
 	}
 
-	const entries = await timeEntryService.getTimeEntries(userId, parsed.data)
+	const entries = await timeEntryService.getTimeEntries(
+		userDb,
+		userId,
+		parsed.data,
+	)
 
 	return c.json({ success: true, data: entries })
 })
@@ -47,6 +52,7 @@ timeEntries.get('/', async (c) => {
  */
 timeEntries.get('/week', async (c) => {
 	const { userId } = getAuthUser(c)
+	const userDb = getAuthUserDb(c)
 	const dateParam = c.req.query('date')
 
 	// Default till denna vecka
@@ -64,7 +70,11 @@ timeEntries.get('/week', async (c) => {
 	const diff = dayOfWeek === 0 ? -6 : 1 - dayOfWeek
 	weekStart.setUTCDate(weekStart.getUTCDate() + diff)
 
-	const entries = await timeEntryService.getWeekEntries(userId, weekStart)
+	const entries = await timeEntryService.getWeekEntries(
+		userDb,
+		userId,
+		weekStart,
+	)
 
 	return c.json({
 		success: true,
@@ -81,9 +91,10 @@ timeEntries.get('/week', async (c) => {
  */
 timeEntries.get('/:id', async (c) => {
 	const { userId } = getAuthUser(c)
+	const userDb = getAuthUserDb(c)
 	const entryId = c.req.param('id')
 
-	const entry = await timeEntryService.getTimeEntry(entryId, userId)
+	const entry = await timeEntryService.getTimeEntry(userDb, entryId, userId)
 
 	if (!entry) {
 		return c.json({ success: false, error: 'Tidrapport hittades inte' }, 404)
@@ -98,6 +109,7 @@ timeEntries.get('/:id', async (c) => {
  */
 timeEntries.post('/', async (c) => {
 	const { userId } = getAuthUser(c)
+	const userDb = getAuthUserDb(c)
 	const body = await c.req.json()
 
 	const parsed = createTimeEntrySchema.safeParse(body)
@@ -112,6 +124,7 @@ timeEntries.post('/', async (c) => {
 	}
 
 	const result = await timeEntryService.createOrUpdateTimeEntry(
+		userDb,
 		userId,
 		parsed.data,
 	)
@@ -129,6 +142,7 @@ timeEntries.post('/', async (c) => {
  */
 timeEntries.patch('/:id', async (c) => {
 	const { userId } = getAuthUser(c)
+	const userDb = getAuthUserDb(c)
 	const entryId = c.req.param('id')
 	const body = await c.req.json()
 
@@ -144,6 +158,7 @@ timeEntries.patch('/:id', async (c) => {
 	}
 
 	const result = await timeEntryService.updateTimeEntry(
+		userDb,
 		entryId,
 		userId,
 		parsed.data,
@@ -162,9 +177,14 @@ timeEntries.patch('/:id', async (c) => {
  */
 timeEntries.delete('/:id', async (c) => {
 	const { userId } = getAuthUser(c)
+	const userDb = getAuthUserDb(c)
 	const entryId = c.req.param('id')
 
-	const deleted = await timeEntryService.deleteTimeEntry(entryId, userId)
+	const deleted = await timeEntryService.deleteTimeEntry(
+		userDb,
+		entryId,
+		userId,
+	)
 
 	if (!deleted) {
 		return c.json({ success: false, error: 'Tidrapport hittades inte' }, 404)
