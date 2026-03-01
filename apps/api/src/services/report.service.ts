@@ -1,4 +1,4 @@
-import type { ReportQuery } from '@time-report/shared'
+import type { PdfReportQuery, ReportQuery } from '@time-report/shared'
 import { isRedDay } from '../lib/swedish-holidays'
 import type { UserPrismaClient } from '../lib/user-db'
 
@@ -90,6 +90,75 @@ export class ReportService {
 				from: query.from,
 				to: query.to,
 			},
+		}
+	}
+
+	/**
+	 * Hämta månadsrapportdata för PDF-generering
+	 */
+	async getMonthlyReportData(
+		userDb: UserPrismaClient,
+		_userId: string,
+		query: PdfReportQuery,
+	) {
+		const { year, month } = query
+		const monthStart = new Date(Date.UTC(year, month - 1, 1))
+		const monthEnd = new Date(Date.UTC(year, month, 0, 23, 59, 59, 999))
+
+		const entries = await userDb.timeEntry.findMany({
+			where: {
+				date: {
+					gte: monthStart,
+					lte: monthEnd,
+				},
+			},
+			include: {
+				project: {
+					select: {
+						id: true,
+						name: true,
+					},
+				},
+			},
+			orderBy: { date: 'asc' },
+		})
+
+		// Group entries by date (YYYY-MM-DD)
+		const dailyHours: { date: string; minutes: number; projects: string[] }[] =
+			[]
+		const dayMap = new Map<string, { minutes: number; projects: Set<string> }>()
+
+		for (const entry of entries) {
+			const dateStr = entry.date.toISOString().split('T')[0]
+			const existing = dayMap.get(dateStr)
+			if (existing) {
+				existing.minutes += entry.minutes
+				existing.projects.add(entry.project.name)
+			} else {
+				dayMap.set(dateStr, {
+					minutes: entry.minutes,
+					projects: new Set([entry.project.name]),
+				})
+			}
+		}
+
+		for (const [date, data] of dayMap) {
+			dailyHours.push({
+				date,
+				minutes: data.minutes,
+				projects: Array.from(data.projects),
+			})
+		}
+
+		dailyHours.sort((a, b) => a.date.localeCompare(b.date))
+
+		const totalMinutes = entries.reduce((sum, entry) => sum + entry.minutes, 0)
+
+		return {
+			year,
+			month,
+			dailyHours,
+			totalMinutes,
 		}
 	}
 
