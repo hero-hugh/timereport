@@ -271,6 +271,35 @@ class ApiClient {
 		}>('/api/reports/dashboard')
 	}
 
+	// PDF
+	async downloadPdfReport(params: { year: number; month: number }) {
+		const query = new URLSearchParams({
+			year: String(params.year),
+			month: String(params.month),
+		})
+		const url = `${this.baseUrl}/api/reports/pdf?${query}`
+
+		const response = await fetch(url, { credentials: 'include' })
+
+		if (response.status === 401) {
+			const refreshed = await this.refreshToken()
+			if (refreshed) {
+				const retryResponse = await fetch(url, { credentials: 'include' })
+				if (!retryResponse.ok) {
+					return { success: false as const, error: 'Kunde inte generera PDF' }
+				}
+				return { success: true as const, blob: await retryResponse.blob() }
+			}
+			return { success: false as const, error: 'Ej inloggad' }
+		}
+
+		if (!response.ok) {
+			return { success: false as const, error: 'Kunde inte generera PDF' }
+		}
+
+		return { success: true as const, blob: await response.blob() }
+	}
+
 	// Holidays
 	async getHolidays(params: { from: string; to: string }) {
 		const query = new URLSearchParams({
