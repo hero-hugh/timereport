@@ -163,7 +163,9 @@ export function LoginPage() {
 				</CardContent>
 			</Card>
 			<footer className="mt-8 w-full max-w-md text-center text-sm text-muted-foreground space-y-1">
-				<p>Tidrapportering - Ett verktyg för enkel och effektiv tidsredovisning.</p>
+				<p>
+					Tidrapportering - Ett verktyg för enkel och effektiv tidsredovisning.
+				</p>
 				<p>Vid frågor eller support, kontakta din administratör.</p>
 			</footer>
 		</div>

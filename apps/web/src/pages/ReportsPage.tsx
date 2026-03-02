@@ -23,6 +23,7 @@ export function ReportsPage() {
 	const [period, setPeriod] = useState<PeriodType>('this-month')
 	const [summary, setSummary] = useState<ReportSummary | null>(null)
 	const [isLoading, setIsLoading] = useState(true)
+	const [isExporting, setIsExporting] = useState(false)
 
 	useEffect(() => {
 		async function loadReport() {
@@ -64,6 +65,27 @@ export function ReportsPage() {
 			month: 'long',
 			year: 'numeric',
 		})
+	}
+
+	const handleExportPdf = async () => {
+		if (!summary) return
+		setIsExporting(true)
+		try {
+			const [yearStr, monthStr] = summary.period.from.split('-')
+			const year = Number(yearStr)
+			const month = Number(monthStr)
+			const result = await api.downloadPdfReport({ year, month })
+			if (result.success) {
+				const url = URL.createObjectURL(result.blob)
+				const a = document.createElement('a')
+				a.href = url
+				a.download = `tidrapport-${year}-${String(month).padStart(2, '0')}.pdf`
+				a.click()
+				URL.revokeObjectURL(url)
+			}
+		} finally {
+			setIsExporting(false)
+		}
 	}
 
 	if (isLoading) {
@@ -164,6 +186,14 @@ export function ReportsPage() {
 							)}
 						</CardContent>
 					</Card>
+
+					<Button
+						className="w-full"
+						onClick={handleExportPdf}
+						disabled={isExporting}
+					>
+						{isExporting ? 'Exporterar...' : 'Exportera till PDF'}
+					</Button>
 				</>
 			)}
 		</div>

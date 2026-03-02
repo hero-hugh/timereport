@@ -1,6 +1,7 @@
-import { reportQuerySchema } from '@time-report/shared'
+import { pdfReportQuerySchema, reportQuerySchema } from '@time-report/shared'
 import { Hono } from 'hono'
 import { getAuthUser, getAuthUserDb, requireAuth } from '../middleware/auth'
+import { pdfService } from '../services/pdf.service'
 import { reportService } from '../services/report.service'
 
 const reports = new Hono()
@@ -49,6 +50,57 @@ reports.get('/dashboard', async (c) => {
 	const stats = await reportService.getDashboardStats(userDb, userId)
 
 	return c.json({ success: true, data: stats })
+})
+
+/**
+ * GET /api/reports/pdf
+ * Generera PDF-rapport för en månad
+ */
+reports.get('/pdf', async (c) => {
+	const { userId, email } = getAuthUser(c)
+	const userDb = getAuthUserDb(c)
+
+	const query = {
+		year: c.req.query('year'),
+		month: c.req.query('month'),
+	}
+
+	const parsed = pdfReportQuerySchema.safeParse(query)
+	if (!parsed.success) {
+		return c.json(
+			{
+				success: false,
+				error:
+					parsed.error.errors[0]?.message ||
+					'Ogiltiga parametrar (year och month krävs)',
+			},
+			400,
+		)
+	}
+
+	const reportData = await reportService.getMonthlyReportData(
+		userDb,
+		userId,
+		parsed.data,
+	)
+
+	const pdfBuffer = await pdfService.generateMonthlyReport({
+		email,
+		year: reportData.year,
+		month: reportData.month,
+		dailyHours: reportData.dailyHours,
+		totalMinutes: reportData.totalMinutes,
+		generatedAt: new Date().toISOString().split('T')[0],
+	})
+
+	const filename = `tidrapport-${parsed.data.year}-${String(parsed.data.month).padStart(2, '0')}.pdf`
+
+	return new Response(pdfBuffer, {
+		headers: {
+			'Content-Type': 'application/pdf',
+			'Content-Disposition': `attachment; filename="${filename}"`,
+		},
+	})
 })
 
 export default reports

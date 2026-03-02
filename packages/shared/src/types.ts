@@ -2,6 +2,7 @@ import type { z } from 'zod'
 import type {
 	createProjectSchema,
 	createTimeEntrySchema,
+	pdfReportQuerySchema,
 	reportQuerySchema,
 	requestOtpSchema,
 	timeEntriesQuerySchema,
@@ -70,6 +71,7 @@ export interface TimeEntryWithProject extends TimeEntry {
 
 // Report types
 export type ReportQuery = z.infer<typeof reportQuerySchema>
+export type PdfReportQuery = z.infer<typeof pdfReportQuerySchema>
 
 export interface ReportSummary {
 	totalMinutes: number
