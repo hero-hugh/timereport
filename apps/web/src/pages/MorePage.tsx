@@ -47,6 +47,21 @@ export function MorePage() {
 				</CardContent>
 			</Card>
 
+			<Card>
+				<CardContent className="p-0">
+					<Link
+						to="/api-settings"
+						className="flex items-center justify-between p-4 hover:bg-muted/50 transition-colors"
+					>
+						<div className="flex items-center gap-3">
+							<span className="text-xl">⚙️</span>
+							<span>API inställningar</span>
+						</div>
+						<span className="text-muted-foreground">→</span>
+					</Link>
+				</CardContent>
+			</Card>
+
 			<div className="pt-4">
 				<Button variant="outline" className="w-full" onClick={handleLogout}>
 					🚪 Logga ut
