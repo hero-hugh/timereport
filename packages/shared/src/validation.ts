@@ -68,3 +68,8 @@ export const pdfReportQuerySchema = z.object({
 export const updateUserSchema = z.object({
 	name: z.string().min(1).max(100).optional(),
 })
+
+// BOX API schemas
+export const boxTokenSchema = z.object({
+	token: z.string().min(1, 'Token krävs'),
+})

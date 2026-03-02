@@ -7,6 +7,7 @@ import auth from './routes/auth'
 import holidays from './routes/holidays'
 import projects from './routes/projects'
 import reports from './routes/reports'
+import settings from './routes/settings'
 import timeEntries from './routes/time-entries'
 
 const app = new Hono()
@@ -31,6 +32,7 @@ app.route('/api/auth', auth)
 app.route('/api/projects', projects)
 app.route('/api/time-entries', timeEntries)
 app.route('/api/reports', reports)
+app.route('/api/settings', settings)
 app.route('/api/holidays', holidays)
 
 // 404 handler
