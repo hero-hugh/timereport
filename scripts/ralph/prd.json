@@ -27,13 +27,13 @@
 			"id": 4,
 			"title": "Block navigation with unsaved changes warning",
 			"description": "Warn users when they try to navigate away from the page with unsaved time entries.\n\nIn `apps/web/src/pages/TimePage.tsx`:\n\n1. Use `beforeunload` event to show browser warning when `hasChanges` is true:\n   ```tsx\n   useEffect(() => {\n     const handleBeforeUnload = (e: BeforeUnloadEvent) => {\n       if (hasChanges) {\n         e.preventDefault()\n         e.returnValue = ''\n       }\n     }\n     window.addEventListener('beforeunload', handleBeforeUnload)\n     return () => window.removeEventListener('beforeunload', handleBeforeUnload)\n   }, [hasChanges])\n   ```\n2. Use React Router's `useBlocker` or similar to intercept in-app navigation when `hasChanges` is true.\n3. Show confirmation dialog: \"Du har osparade ändringar. Vill du lämna sidan utan att spara?\"\n4. If user confirms, discard changes and navigate.\n5. If user cancels, stay on page.\n6. Warning appears regardless of whether action bar is currently visible or hidden - it depends on `hasChanges`, NOT `showActionBar`.\n\nRun typecheck to confirm no errors. Verify in browser using dev-browser skill.",
-			"passes": false
+			"passes": true
 		},
 		{
 			"id": 5,
 			"title": "Remove old save button and integrate action bar",
 			"description": "Replace the old save button with the new UnsavedChangesBar component.\n\nIn `apps/web/src/pages/TimePage.tsx` (lines 474-481):\n\n1. Remove the existing \"Spara ändringar\" button.\n2. Add the `UnsavedChangesBar` component with props:\n   ```tsx\n   <UnsavedChangesBar\n     visible={showActionBar && hasChanges}\n     onCancel={() => setShowActionBar(false)}\n     onSave={handleSave}\n     isSaving={isSaving}\n   />\n   ```\n3. No visual layout shift when removing old button.\n4. Ensure save action sets both `hasChanges` and `showActionBar` to false on success.\n\nRun typecheck to confirm no errors. Verify in browser using dev-browser skill.",
-			"passes": false
+			"passes": true
 		},
 		{
 			"id": 6,

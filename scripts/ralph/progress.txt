@@ -9,6 +9,9 @@ Started: tis  3 mar 2026 21:04:25 CET
 - Run `npx biome format --write <file>` after creating/editing files to fix formatting before lint check
 - TypeScript check: `npx tsc --noEmit -p apps/web/tsconfig.json`
 - Lint check: `npx biome check <file>`
+- App uses `createBrowserRouter` (data router) — `useBlocker` is available for navigation guards
+- Tests use `MemoryRouter` independently and are unaffected by the main router setup
+- Run tests from repo root: `cd apps/web && npx vitest run` (working dir matters for git paths)
 
 ---
 
@@ -49,4 +52,29 @@ Started: tis  3 mar 2026 21:04:25 CET
 - **Learnings for future iterations:**
   - The Cancel behavior was a natural side effect of Story 2's integration — `onCancel` only sets `showActionBar = false`, which preserves all data
   - When stories build on each other, check if prior work already satisfies later requirements before writing new code
+---
+
+## 2026-03-03 21:14 - HUG-25-4
+- Added `beforeunload` event handler to warn on browser/tab close with unsaved changes
+- Added `useBlocker` hook to intercept in-app React Router navigation when `hasChanges` is true
+- Shows `window.confirm` dialog: "Du har osparade ändringar. Vill du lämna sidan utan att spara?"
+- User can confirm (navigate away, discard changes) or cancel (stay on page)
+- Warning depends on `hasChanges`, NOT `showActionBar` — works even if action bar is hidden
+- Migrated `App.tsx` from `BrowserRouter` to `createBrowserRouter` + `RouterProvider` (required for `useBlocker`)
+- Files changed: `apps/web/src/App.tsx` (modified), `apps/web/src/pages/TimePage.tsx` (modified)
+- **Learnings for future iterations:**
+  - `useBlocker` requires a data router (`createBrowserRouter`), not `<BrowserRouter>` — the migration is mechanical
+  - `AuthProvider` doesn't use router hooks, so it can be placed in a root layout route via `<Outlet />`
+  - Tests using `MemoryRouter` are independent of the main router and don't need changes
+  - The `blocker.state === 'blocked'` pattern with `window.confirm` + `proceed()`/`reset()` is the simplest way to handle navigation blocking
+---
+
+## 2026-03-03 21:16 - HUG-25-5
+- Removed the old "Spara ändringar" button from TimePage.tsx (lines 517-524)
+- UnsavedChangesBar was already integrated with correct props from Story 2
+- Save action already resets both `hasChanges` and `showActionBar` via `loadData()` — no additional changes needed
+- Files changed: `apps/web/src/pages/TimePage.tsx` (modified — 9 lines removed)
+- **Learnings for future iterations:**
+  - Most of the work for Story 5 was already done in Story 2 (integration) — only the old button removal was needed
+  - When stories overlap, check what prior stories already implemented before writing new code
 ---
