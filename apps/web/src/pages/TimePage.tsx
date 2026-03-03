@@ -514,15 +514,6 @@ export function TimePage() {
 				</CardContent>
 			</Card>
 
-			{/* Save button */}
-			<Button
-				onClick={handleSave}
-				disabled={!hasChanges || isSaving}
-				className="w-full"
-			>
-				{isSaving ? 'Sparar...' : 'Spara ändringar'}
-			</Button>
-
 			<UnsavedChangesBar
 				visible={showActionBar && hasChanges}
 				onCancel={() => setShowActionBar(false)}
