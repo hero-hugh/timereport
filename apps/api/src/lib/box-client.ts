@@ -40,10 +40,17 @@ export interface PageInfo {
 	hasNextPage: boolean
 }
 
+export interface BoxUser {
+	id: string
+	type: string
+	firstName: string
+	lastName: string
+}
+
 export interface TimeReportNode {
 	id: string
 	date: string
-	usage: number
+	usage: BoxUser
 	totalHours: string
 }
 
@@ -115,7 +122,14 @@ const GET_TIME_REPORTS_QUERY = `
         node {
           id
           date
-          usage
+          usage {
+            ... on User {
+              id
+              type
+              firstName
+              lastName
+            }
+          }
           totalHours
         }
       }

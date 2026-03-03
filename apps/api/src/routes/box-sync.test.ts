@@ -63,7 +63,7 @@ const MOCK_BOX_LISTING_REPORT: TimeReportNode = {
 	id: 'box-report-1',
 	date: '2024-03-01',
 	totalHours: '00:00',
-	usage: 0,
+	usage: { id: 'user-1', type: 'User', firstName: 'Test', lastName: 'User' },
 }
 
 const MOCK_BOX_REPORT: BoxTimeReport = {
@@ -269,7 +269,12 @@ describe('POST /api/box/sync', () => {
 			id: 'box-report-2',
 			date: '2024-03-01',
 			totalHours: '08:00',
-			usage: 0,
+			usage: {
+				id: 'user-1',
+				type: 'User',
+				firstName: 'Test',
+				lastName: 'User',
+			},
 		}
 
 		const boxReportWithCommon: BoxTimeReport = {
@@ -467,7 +472,12 @@ describe('POST /api/box/sync', () => {
 			id: 'box-report-3',
 			date: '2024-03-01',
 			totalHours: '00:00',
-			usage: 0,
+			usage: {
+				id: 'user-1',
+				type: 'User',
+				firstName: 'Test',
+				lastName: 'User',
+			},
 		}
 
 		const boxReport: BoxTimeReport = {
