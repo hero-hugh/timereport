@@ -25,6 +25,10 @@ export function ReportsPage() {
 	const [isLoading, setIsLoading] = useState(true)
 	const [isExporting, setIsExporting] = useState(false)
 	const [isSendingToBox, setIsSendingToBox] = useState(false)
+	const [boxResult, setBoxResult] = useState<{
+		success: boolean
+		message: string
+	} | null>(null)
 
 	useEffect(() => {
 		async function loadReport() {
@@ -68,6 +72,13 @@ export function ReportsPage() {
 		})
 	}
 
+	useEffect(() => {
+		if (boxResult?.success) {
+			const timer = setTimeout(() => setBoxResult(null), 3000)
+			return () => clearTimeout(timer)
+		}
+	}, [boxResult])
+
 	const handleExportPdf = async () => {
 		if (!summary) return
 		setIsExporting(true)
@@ -92,11 +103,25 @@ export function ReportsPage() {
 	const handleSendToBox = async () => {
 		if (!summary) return
 		setIsSendingToBox(true)
+		setBoxResult(null)
 		try {
 			const [yearStr, monthStr] = summary.period.from.split('-')
 			const year = Number(yearStr)
 			const month = Number(monthStr)
-			await api.sendToBox({ year, month })
+			const result = await api.sendToBox({ year, month })
+			if (result.success) {
+				setBoxResult({ success: true, message: 'Tidrapport skickad till BOX' })
+			} else {
+				setBoxResult({
+					success: false,
+					message: result.error || 'Kunde inte skicka till BOX',
+				})
+			}
+		} catch {
+			setBoxResult({
+				success: false,
+				message: 'Kunde inte skicka till BOX',
+			})
 		} finally {
 			setIsSendingToBox(false)
 		}
@@ -217,6 +242,28 @@ export function ReportsPage() {
 							{isSendingToBox ? 'Skickar...' : 'Skicka till BOX'}
 						</Button>
 					</div>
+
+					{boxResult && (
+						<div
+							className={`rounded-lg border p-4 flex items-start justify-between gap-2 ${
+								boxResult.success
+									? 'bg-green-50 border-green-200 text-green-800'
+									: 'bg-red-50 border-red-200 text-red-800'
+							}`}
+						>
+							<p className="text-sm">
+								{boxResult.success ? '\u2713 ' : ''}
+								{boxResult.message}
+							</p>
+							<button
+								type="button"
+								className="text-sm font-medium hover:opacity-70"
+								onClick={() => setBoxResult(null)}
+							>
+								\u2715
+							</button>
+						</div>
+					)}
 				</>
 			)}
 		</div>
