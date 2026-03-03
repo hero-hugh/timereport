@@ -1,4 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
+import { useBlocker } from 'react-router-dom'
+import { UnsavedChangesBar } from '../components/UnsavedChangesBar'
 import { Button } from '../components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card'
 import { Input } from '../components/ui/input'
@@ -43,9 +45,41 @@ export function TimePage() {
 	const [isLoading, setIsLoading] = useState(true)
 	const [isSaving, setIsSaving] = useState(false)
 	const [hasChanges, setHasChanges] = useState(false)
+	const [showActionBar, setShowActionBar] = useState(false)
 
 	const weekDays = getWeekDays(weekStart)
 	const weekNumber = getWeekNumber(weekStart)
+
+	// Warn on browser/tab close with unsaved changes
+	useEffect(() => {
+		const handleBeforeUnload = (e: BeforeUnloadEvent) => {
+			if (hasChanges) {
+				e.preventDefault()
+				e.returnValue = ''
+			}
+		}
+		window.addEventListener('beforeunload', handleBeforeUnload)
+		return () => window.removeEventListener('beforeunload', handleBeforeUnload)
+	}, [hasChanges])
+
+	// Block in-app navigation with unsaved changes
+	const blocker = useBlocker(
+		({ currentLocation, nextLocation }) =>
+			hasChanges && currentLocation.pathname !== nextLocation.pathname,
+	)
+
+	useEffect(() => {
+		if (blocker.state === 'blocked') {
+			const confirmed = window.confirm(
+				'Du har osparade ändringar. Vill du lämna sidan utan att spara?',
+			)
+			if (confirmed) {
+				blocker.proceed()
+			} else {
+				blocker.reset()
+			}
+		}
+	}, [blocker])
 
 	const loadData = useCallback(async () => {
 		setIsLoading(true)
@@ -91,6 +125,7 @@ export function TimePage() {
 			}
 
 			setHasChanges(false)
+			setShowActionBar(false)
 		} catch (error) {
 			console.error('Failed to load data:', error)
 		} finally {
@@ -142,6 +177,12 @@ export function TimePage() {
 			return newData
 		})
 		setHasChanges(true)
+	}
+
+	const handleTimeBlur = () => {
+		if (hasChanges) {
+			setShowActionBar(true)
+		}
 	}
 
 	const handleSave = async () => {
@@ -320,6 +361,7 @@ export function TimePage() {
 														e.target.value,
 													)
 												}
+												onBlur={handleTimeBlur}
 												className={cn(
 													'text-center h-12 text-lg',
 													redDay && 'bg-red-50 border-red-200',
@@ -406,6 +448,7 @@ export function TimePage() {
 																e.target.value,
 															)
 														}
+														onBlur={handleTimeBlur}
 														className={cn(
 															'text-center w-full',
 															redDay && 'border-red-200',
@@ -471,14 +514,12 @@ export function TimePage() {
 				</CardContent>
 			</Card>
 
-			{/* Save button */}
-			<Button
-				onClick={handleSave}
-				disabled={!hasChanges || isSaving}
-				className="w-full"
-			>
-				{isSaving ? 'Sparar...' : 'Spara ändringar'}
-			</Button>
+			<UnsavedChangesBar
+				visible={showActionBar && hasChanges}
+				onCancel={() => setShowActionBar(false)}
+				onSave={handleSave}
+				isSaving={isSaving}
+			/>
 
 			{projects.length === 0 && (
 				<Card>
