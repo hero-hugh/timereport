@@ -35,8 +35,8 @@ export function MorePage() {
 							<div className="w-12 h-12 shrink-0 bg-primary/10 rounded-full flex items-center justify-center text-xl">
 								👤
 							</div>
-							<div className="flex-1">
-								<p className="font-medium">{user?.email}</p>
+							<div className="flex-1 min-w-0">
+								<p className="font-medium truncate">{user?.email}</p>
 								<p className="text-sm text-muted-foreground">
 									{profileName || 'Ingen profil konfigurerad'}
 								</p>
