@@ -300,6 +300,18 @@ class ApiClient {
 		return { success: true as const, blob: await response.blob() }
 	}
 
+	// BOX token
+	async getBoxTokenStatus() {
+		return this.request<{ hasToken: boolean }>('/api/user/box-token')
+	}
+
+	async saveBoxToken(token: string) {
+		return this.request<{ message: string }>('/api/user/box-token', {
+			method: 'PUT',
+			body: JSON.stringify({ token }),
+		})
+	}
+
 	// Holidays
 	async getHolidays(params: { from: string; to: string }) {
 		const query = new URLSearchParams({
