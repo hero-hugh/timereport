@@ -2,6 +2,7 @@ import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom'
 import { Layout } from './components/Layout'
 import { ProtectedRoute } from './components/ProtectedRoute'
 import { AuthProvider } from './hooks/useAuth'
+import { ApiSettingsPage } from './pages/ApiSettingsPage'
 import { DashboardPage } from './pages/DashboardPage'
 import { LoginPage } from './pages/LoginPage'
 import { MorePage } from './pages/MorePage'
@@ -30,6 +31,7 @@ function App() {
 						<Route path="projects/new" element={<ProjectFormPage />} />
 						<Route path="projects/:id" element={<ProjectFormPage />} />
 						<Route path="reports" element={<ReportsPage />} />
+						<Route path="api-settings" element={<ApiSettingsPage />} />
 						<Route path="more" element={<MorePage />} />
 					</Route>
 					<Route path="*" element={<Navigate to="/" replace />} />
