@@ -66,17 +66,21 @@ export async function fetchBoxGraphQL<T>(
 }
 
 const GET_TIME_REPORTS_QUERY = `
-  query GetTimeReports($year: Int!, $month: Int!) {
-    timeReports(year: $year, month: $month) {
-      id
-      date
-      totalHours
-      timeReportEntries {
-        id
-        type
-        date
-        hours
-        comment
+  query GetTimeReports($first: Int!, $page: Int, $orderBy: [GetTimeReportsOrderByClause], $filters: GetTimeReportFilters) {
+    timeReports(first: $first, page: $page, orderBy: $orderBy, filters: $filters) {
+      totalCount
+      edges {
+        node {
+          id
+          date
+          usage
+          totalHours
+        }
+      }
+      pageInfo {
+        currentPage
+        hasPreviousPage
+        hasNextPage
       }
     }
   }
