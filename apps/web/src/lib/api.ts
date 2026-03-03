@@ -104,6 +104,19 @@ class ApiClient {
 		}>('/api/auth/me')
 	}
 
+	// Profile
+	async updateProfile(data: { firstName: string; lastName: string }) {
+		return this.request<{
+			id: string
+			email: string
+			firstName: string
+			lastName: string
+		}>('/api/user/profile', {
+			method: 'PATCH',
+			body: JSON.stringify(data),
+		})
+	}
+
 	// Projects
 	async getProjects(includeInactive = false) {
 		const query = includeInactive ? '?includeInactive=true' : ''
