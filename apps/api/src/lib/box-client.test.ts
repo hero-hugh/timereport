@@ -58,10 +58,10 @@ describe('fetchBoxGraphQL', () => {
 		fetchMock.mockRejectedValueOnce(new Error('Failed to connect'))
 
 		const error = await fetchBoxGraphQL('token', 'query { test }').catch(
-			(e) => e,
+			(e: unknown) => e,
 		)
 		expect(error).toBeInstanceOf(BoxApiError)
-		expect(error.message).toContain('Network error')
+		expect((error as BoxApiError).message).toContain('Network error')
 	})
 
 	it('throws BoxApiError on non-OK HTTP status', async () => {
