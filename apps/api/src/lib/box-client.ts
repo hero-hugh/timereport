@@ -34,6 +34,29 @@ export interface BoxTimeReport {
 	timeReportEntries: BoxTimeReportEntry[]
 }
 
+export interface PageInfo {
+	currentPage: number
+	hasPreviousPage: boolean
+	hasNextPage: boolean
+}
+
+export interface TimeReportNode {
+	id: string
+	date: string
+	usage: number
+	totalHours: string
+}
+
+export interface TimeReportEdge {
+	node: TimeReportNode
+}
+
+export interface TimeReportsResponse {
+	totalCount: number
+	edges: TimeReportEdge[]
+	pageInfo: PageInfo
+}
+
 interface BoxGraphQLResponse<T> {
 	data?: T
 	errors?: Array<{ message: string }>
@@ -143,13 +166,9 @@ export async function getTimeReports(
 	token: string,
 	year: number,
 	month: number,
-): Promise<BoxTimeReport[]> {
+): Promise<TimeReportNode[]> {
 	const data = await fetchBoxGraphQL<{
-		timeReports: {
-			edges: Array<{
-				node: BoxTimeReport
-			}>
-		}
+		timeReports: TimeReportsResponse
 	}>(token, GET_TIME_REPORTS_QUERY, {
 		first: 100,
 		filters: {

@@ -1,7 +1,11 @@
 import { Hono } from 'hono'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { authDb } from '../lib/auth-db'
-import { BoxApiError, type BoxTimeReport } from '../lib/box-client'
+import {
+	BoxApiError,
+	type BoxTimeReport,
+	type TimeReportNode,
+} from '../lib/box-client'
 import { testUserDb } from '../test/test-user-db'
 
 vi.mock('../lib/jwt', () => ({
@@ -53,6 +57,13 @@ async function createTestUserWithToken(
 			boxApiToken: token,
 		},
 	})
+}
+
+const MOCK_BOX_LISTING_REPORT: TimeReportNode = {
+	id: 'box-report-1',
+	date: '2024-03-01',
+	totalHours: '00:00',
+	usage: 0,
 }
 
 const MOCK_BOX_REPORT: BoxTimeReport = {
@@ -193,7 +204,7 @@ describe('POST /api/box/sync', () => {
 
 		const { getTimeReports, getSingleTimeReport, updateTimeReport } =
 			await import('../lib/box-client')
-		vi.mocked(getTimeReports).mockResolvedValueOnce([MOCK_BOX_REPORT])
+		vi.mocked(getTimeReports).mockResolvedValueOnce([MOCK_BOX_LISTING_REPORT])
 		vi.mocked(getSingleTimeReport).mockResolvedValueOnce(MOCK_BOX_REPORT)
 		vi.mocked(updateTimeReport).mockResolvedValueOnce(MOCK_BOX_REPORT)
 
@@ -254,6 +265,13 @@ describe('POST /api/box/sync', () => {
 
 		// No local time entries for March 2024
 
+		const boxReportListing: TimeReportNode = {
+			id: 'box-report-2',
+			date: '2024-03-01',
+			totalHours: '08:00',
+			usage: 0,
+		}
+
 		const boxReportWithCommon: BoxTimeReport = {
 			id: 'box-report-2',
 			date: '2024-03-01',
@@ -271,7 +289,7 @@ describe('POST /api/box/sync', () => {
 
 		const { getTimeReports, getSingleTimeReport, updateTimeReport } =
 			await import('../lib/box-client')
-		vi.mocked(getTimeReports).mockResolvedValueOnce([boxReportWithCommon])
+		vi.mocked(getTimeReports).mockResolvedValueOnce([boxReportListing])
 		vi.mocked(getSingleTimeReport).mockResolvedValueOnce(boxReportWithCommon)
 		vi.mocked(updateTimeReport).mockResolvedValueOnce(boxReportWithCommon)
 
@@ -360,7 +378,7 @@ describe('POST /api/box/sync', () => {
 
 		const { getTimeReports, getSingleTimeReport, updateTimeReport } =
 			await import('../lib/box-client')
-		vi.mocked(getTimeReports).mockResolvedValueOnce([MOCK_BOX_REPORT])
+		vi.mocked(getTimeReports).mockResolvedValueOnce([MOCK_BOX_LISTING_REPORT])
 		vi.mocked(getSingleTimeReport).mockResolvedValueOnce(MOCK_BOX_REPORT)
 		vi.mocked(updateTimeReport).mockRejectedValueOnce(
 			new BoxApiError('Invalid hours format'),
@@ -445,6 +463,13 @@ describe('POST /api/box/sync', () => {
 			},
 		})
 
+		const boxReportListing: TimeReportNode = {
+			id: 'box-report-3',
+			date: '2024-03-01',
+			totalHours: '00:00',
+			usage: 0,
+		}
+
 		const boxReport: BoxTimeReport = {
 			id: 'box-report-3',
 			date: '2024-03-01',
@@ -462,7 +487,7 @@ describe('POST /api/box/sync', () => {
 
 		const { getTimeReports, getSingleTimeReport, updateTimeReport } =
 			await import('../lib/box-client')
-		vi.mocked(getTimeReports).mockResolvedValueOnce([boxReport])
+		vi.mocked(getTimeReports).mockResolvedValueOnce([boxReportListing])
 		vi.mocked(getSingleTimeReport).mockResolvedValueOnce(boxReport)
 		vi.mocked(updateTimeReport).mockResolvedValueOnce(boxReport)
 
