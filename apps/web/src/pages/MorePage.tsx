@@ -32,17 +32,17 @@ export function MorePage() {
 						onClick={() => setProfileDialogOpen(true)}
 					>
 						<div className="flex items-center gap-3">
-							<div className="w-12 h-12 bg-primary/10 rounded-full flex items-center justify-center text-xl">
+							<div className="w-12 h-12 shrink-0 bg-primary/10 rounded-full flex items-center justify-center text-xl">
 								👤
 							</div>
-							<div className="flex-1">
-								<p className="font-medium">{user?.email}</p>
+							<div className="flex-1 min-w-0">
+								<p className="font-medium truncate">{user?.email}</p>
 								<p className="text-sm text-muted-foreground">
 									{profileName || 'Ingen profil konfigurerad'}
 								</p>
 							</div>
-							<span className="text-sm text-muted-foreground">
-								Redigera profil →
+							<span className="text-sm text-muted-foreground shrink-0">
+								<span className="hidden sm:inline">Redigera profil </span>→
 							</span>
 						</div>
 					</button>
