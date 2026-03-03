@@ -1,7 +1,7 @@
 import { Hono } from 'hono'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { authDb } from '../lib/auth-db'
-import type { BoxTimeReport } from '../lib/box-client'
+import { BoxApiError, type BoxTimeReport } from '../lib/box-client'
 import { testUserDb } from '../test/test-user-db'
 
 vi.mock('../lib/jwt', () => ({
@@ -13,11 +13,15 @@ vi.mock('../lib/user-db', () => ({
 	UserPrismaClient: {},
 }))
 
-vi.mock('../lib/box-client', () => ({
-	getTimeReports: vi.fn(),
-	getSingleTimeReport: vi.fn(),
-	updateTimeReport: vi.fn(),
-}))
+vi.mock('../lib/box-client', async (importOriginal) => {
+	const actual = await importOriginal<typeof import('../lib/box-client')>()
+	return {
+		...actual,
+		getTimeReports: vi.fn(),
+		getSingleTimeReport: vi.fn(),
+		updateTimeReport: vi.fn(),
+	}
+})
 
 const { default: boxSync } = await import('./box-sync')
 
@@ -289,6 +293,120 @@ describe('POST /api/box/sync', () => {
 			hours: '00:00',
 			comment: 'Old entry',
 		})
+	})
+
+	it('returns 502 with Swedish message when BOX API has network error', async () => {
+		await createTestUserWithToken()
+		await authenticateRequest()
+
+		const { getTimeReports } = await import('../lib/box-client')
+		vi.mocked(getTimeReports).mockRejectedValueOnce(
+			new BoxApiError('Network error: fetch failed'),
+		)
+
+		const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
+
+		const res = await app.request('/api/box/sync', {
+			method: 'POST',
+			headers: {
+				Authorization: 'Bearer valid-token',
+				'Content-Type': 'application/json',
+			},
+			body: JSON.stringify({ year: 2024, month: 3 }),
+		})
+		expect(res.status).toBe(502)
+
+		const body = (await res.json()) as { success: boolean; error: string }
+		expect(body.success).toBe(false)
+		expect(body.error).toBe('Nätverksfel - försök igen')
+		expect(consoleSpy).toHaveBeenCalledWith(
+			'BOX API error fetching time reports:',
+			'Network error: fetch failed',
+		)
+		consoleSpy.mockRestore()
+	})
+
+	it('returns 502 with auth error message for 401 status', async () => {
+		await createTestUserWithToken()
+		await authenticateRequest()
+
+		const { getTimeReports } = await import('../lib/box-client')
+		vi.mocked(getTimeReports).mockRejectedValueOnce(
+			new BoxApiError('BOX API returned status 401'),
+		)
+
+		const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
+
+		const res = await app.request('/api/box/sync', {
+			method: 'POST',
+			headers: {
+				Authorization: 'Bearer valid-token',
+				'Content-Type': 'application/json',
+			},
+			body: JSON.stringify({ year: 2024, month: 3 }),
+		})
+		expect(res.status).toBe(502)
+
+		const body = (await res.json()) as { success: boolean; error: string }
+		expect(body.error).toBe(
+			'BOX API token ogiltigt - kontrollera token i API inställningar',
+		)
+		consoleSpy.mockRestore()
+	})
+
+	it('returns 502 with time format error for hours validation', async () => {
+		await createTestUserWithToken()
+		await authenticateRequest()
+
+		const { getTimeReports, getSingleTimeReport, updateTimeReport } =
+			await import('../lib/box-client')
+		vi.mocked(getTimeReports).mockResolvedValueOnce([MOCK_BOX_REPORT])
+		vi.mocked(getSingleTimeReport).mockResolvedValueOnce(MOCK_BOX_REPORT)
+		vi.mocked(updateTimeReport).mockRejectedValueOnce(
+			new BoxApiError('Invalid hours format'),
+		)
+
+		const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
+
+		const res = await app.request('/api/box/sync', {
+			method: 'POST',
+			headers: {
+				Authorization: 'Bearer valid-token',
+				'Content-Type': 'application/json',
+			},
+			body: JSON.stringify({ year: 2024, month: 3 }),
+		})
+		expect(res.status).toBe(502)
+
+		const body = (await res.json()) as { success: boolean; error: string }
+		expect(body.error).toBe('Ett fel uppstod med tidsformatet')
+		consoleSpy.mockRestore()
+	})
+
+	it('returns 502 with BOX error message for other GraphQL errors', async () => {
+		await createTestUserWithToken()
+		await authenticateRequest()
+
+		const { getTimeReports } = await import('../lib/box-client')
+		vi.mocked(getTimeReports).mockRejectedValueOnce(
+			new BoxApiError('Some unexpected GraphQL error'),
+		)
+
+		const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
+
+		const res = await app.request('/api/box/sync', {
+			method: 'POST',
+			headers: {
+				Authorization: 'Bearer valid-token',
+				'Content-Type': 'application/json',
+			},
+			body: JSON.stringify({ year: 2024, month: 3 }),
+		})
+		expect(res.status).toBe(502)
+
+		const body = (await res.json()) as { success: boolean; error: string }
+		expect(body.error).toBe('Some unexpected GraphQL error')
+		consoleSpy.mockRestore()
 	})
 
 	it('aggregates multiple local entries for the same date', async () => {

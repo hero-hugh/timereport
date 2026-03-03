@@ -117,10 +117,15 @@ export function ReportsPage() {
 					message: result.error || 'Kunde inte skicka till BOX',
 				})
 			}
-		} catch {
+		} catch (error) {
+			const isNetworkError =
+				error instanceof TypeError ||
+				(error instanceof Error && error.message === 'Failed to fetch')
 			setBoxResult({
 				success: false,
-				message: 'Kunde inte skicka till BOX',
+				message: isNetworkError
+					? 'Nätverksfel - försök igen'
+					: 'Kunde inte skicka till BOX',
 			})
 		} finally {
 			setIsSendingToBox(false)

@@ -2,6 +2,7 @@ import { Hono } from 'hono'
 import { z } from 'zod'
 import { authDb } from '../lib/auth-db'
 import {
+	BoxApiError,
 	type BoxTimeReportEntry,
 	type UpdateTimeReportEntryInput,
 	getSingleTimeReport,
@@ -10,6 +11,20 @@ import {
 } from '../lib/box-client'
 import { minutesToHHMM } from '../lib/box-mapper'
 import { getAuthUser, getAuthUserDb, requireAuth } from '../middleware/auth'
+
+function mapBoxErrorToUserMessage(error: BoxApiError): string {
+	const msg = error.message
+	if (msg.startsWith('Network error:')) {
+		return 'Nätverksfel - försök igen'
+	}
+	if (msg.includes('401') || msg.includes('403')) {
+		return 'BOX API token ogiltigt - kontrollera token i API inställningar'
+	}
+	if (msg.includes('hours') || msg.includes('Hours')) {
+		return 'Ett fel uppstod med tidsformatet'
+	}
+	return msg || 'Kunde inte skicka till BOX'
+}
 
 const boxSync = new Hono()
 
@@ -98,7 +113,19 @@ boxSync.post('/sync', async (c) => {
 	}
 
 	// 4. Find the BOX report for this month
-	const boxReports = await getTimeReports(token, year, month)
+	let boxReports: Awaited<ReturnType<typeof getTimeReports>>
+	try {
+		boxReports = await getTimeReports(token, year, month)
+	} catch (error) {
+		if (error instanceof BoxApiError) {
+			console.error('BOX API error fetching time reports:', error.message)
+			return c.json(
+				{ success: false, error: mapBoxErrorToUserMessage(error) },
+				502,
+			)
+		}
+		throw error
+	}
 
 	if (!boxReports.length) {
 		return c.json(
@@ -113,7 +140,19 @@ boxSync.post('/sync', async (c) => {
 	const boxReport = boxReports[0]
 
 	// 5. Get existing entries from the BOX report
-	const fullReport = await getSingleTimeReport(token, boxReport.id)
+	let fullReport: Awaited<ReturnType<typeof getSingleTimeReport>>
+	try {
+		fullReport = await getSingleTimeReport(token, boxReport.id)
+	} catch (error) {
+		if (error instanceof BoxApiError) {
+			console.error('BOX API error fetching single report:', error.message)
+			return c.json(
+				{ success: false, error: mapBoxErrorToUserMessage(error) },
+				502,
+			)
+		}
+		throw error
+	}
 
 	// 6. Map local entries onto BOX entries
 	const updatedEntries: UpdateTimeReportEntryInput[] =
@@ -152,7 +191,18 @@ boxSync.post('/sync', async (c) => {
 		})
 
 	// 7. Update the BOX report
-	await updateTimeReport(token, boxReport.id, updatedEntries)
+	try {
+		await updateTimeReport(token, boxReport.id, updatedEntries)
+	} catch (error) {
+		if (error instanceof BoxApiError) {
+			console.error('BOX API error updating time report:', error.message)
+			return c.json(
+				{ success: false, error: mapBoxErrorToUserMessage(error) },
+				502,
+			)
+		}
+		throw error
+	}
 
 	return c.json({
 		success: true,
