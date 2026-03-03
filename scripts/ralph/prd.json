@@ -1,0 +1,33 @@
+{
+	"identifier": "HUG-20",
+	"title": "PRD: Fix GraphQL argument error when syncing to BOX",
+	"description": "When users attempt to sync their time report to the BOX system, they encounter a GraphQL error: Unknown argument \"year\" on field \"timeReports\" of type \"Query\". The current implementation incorrectly passes year and month as direct arguments, but the BOX API expects these as nested objects within a filters parameter. Fix the GraphQL query structure, update the filters construction, add correct TypeScript types for the paginated response, and verify end-to-end sync works without errors.",
+	"branchName": "mikael/hug-20-prd-fix-graphql-argument-error-when-syncing-to-box",
+	"url": "https://linear.app/hero-hugh/issue/HUG-20/prd-fix-graphql-argument-error-when-syncing-to-box",
+	"userStories": [
+		{
+			"id": 1,
+			"title": "Update GetTimeReports query structure",
+			"description": "Update GET_TIME_REPORTS_QUERY in apps/api/src/lib/box-client.ts to use the correct BOX API schema. Replace the current incorrect query that uses direct $year: Int! and $month: Int! parameters with the correct structure using $first: Int!, $page: Int, $orderBy: [GetTimeReportsOrderByClause], and $filters: GetTimeReportFilters parameters. The query should return paginated results with totalCount, edges containing node objects (with id, date, usage, totalHours), and pageInfo (with currentPage, hasPreviousPage, hasNextPage). Remove the invalid direct year/month arguments. Run typecheck and lint to confirm no errors are introduced.",
+			"passes": true
+		},
+		{
+			"id": 2,
+			"title": "Update getTimeReports function to pass filters correctly",
+			"description": "Update the getTimeReports function in apps/api/src/lib/box-client.ts to construct the filters object correctly when calling the BOX API. Build a filters object with year as { value: year, label: year.toString() } and month as { value: month, label: getMonthName(month) }. Add a helper function or constant array for month name conversion (1 → January, 2 → February, etc.). Set first: 100 for pagination to retrieve all entries for the month. Parse the paginated response correctly by extracting data from data.timeReports.edges[].node. Run typecheck and lint to confirm no errors are introduced.",
+			"passes": true
+		},
+		{
+			"id": 3,
+			"title": "Update TypeScript types for BOX API response",
+			"description": "Add or update TypeScript types in apps/api/src/lib/box-client.ts to match BOX's paginated response format. Add TimeReportsResponse type with totalCount, edges array, and pageInfo. Add TimeReportEdge type with node containing report data (id, date, totalHours, and usage). Add PageInfo type with currentPage, hasPreviousPage, and hasNextPage. Update the getTimeReports function return type to use the new types. Run typecheck and lint to confirm no errors are introduced.",
+			"passes": true
+		},
+		{
+			"id": 4,
+			"title": "Test BOX sync end-to-end",
+			"description": "Verify that syncing a time report to BOX completes successfully without GraphQL errors. Ensure the correct time entries are sent to BOX for the selected month. Confirm no console errors occur during the sync operation. Check that the response parsing in apps/api/src/routes/box-sync.ts works correctly with the new paginated response structure, making any minor adjustments needed. Run typecheck, lint, and tests to confirm no errors are introduced.",
+			"passes": true
+		}
+	]
+}
