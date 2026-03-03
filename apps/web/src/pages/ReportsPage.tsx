@@ -257,7 +257,7 @@ export function ReportsPage() {
 							}`}
 						>
 							<p className="text-sm">
-								{boxResult.success ? '\u2713 ' : ''}
+								{boxResult.success ? '✓ ' : ''}
 								{boxResult.message}
 							</p>
 							<button
@@ -265,7 +265,7 @@ export function ReportsPage() {
 								className="text-sm font-medium hover:opacity-70"
 								onClick={() => setBoxResult(null)}
 							>
-								\u2715
+								×
 							</button>
 						</div>
 					)}
