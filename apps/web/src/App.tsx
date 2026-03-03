@@ -1,4 +1,9 @@
-import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom'
+import {
+	Navigate,
+	Outlet,
+	RouterProvider,
+	createBrowserRouter,
+} from 'react-router-dom'
 import { Layout } from './components/Layout'
 import { ProtectedRoute } from './components/ProtectedRoute'
 import { AuthProvider } from './hooks/useAuth'
@@ -11,34 +16,44 @@ import { ProjectsPage } from './pages/ProjectsPage'
 import { ReportsPage } from './pages/ReportsPage'
 import { TimePage } from './pages/TimePage'
 
-function App() {
+function AuthLayout() {
 	return (
-		<BrowserRouter>
-			<AuthProvider>
-				<Routes>
-					<Route path="/login" element={<LoginPage />} />
-					<Route
-						path="/"
-						element={
-							<ProtectedRoute>
-								<Layout />
-							</ProtectedRoute>
-						}
-					>
-						<Route index element={<DashboardPage />} />
-						<Route path="time" element={<TimePage />} />
-						<Route path="projects" element={<ProjectsPage />} />
-						<Route path="projects/new" element={<ProjectFormPage />} />
-						<Route path="projects/:id" element={<ProjectFormPage />} />
-						<Route path="reports" element={<ReportsPage />} />
-						<Route path="api-settings" element={<ApiSettingsPage />} />
-						<Route path="more" element={<MorePage />} />
-					</Route>
-					<Route path="*" element={<Navigate to="/" replace />} />
-				</Routes>
-			</AuthProvider>
-		</BrowserRouter>
+		<AuthProvider>
+			<Outlet />
+		</AuthProvider>
 	)
+}
+
+const router = createBrowserRouter([
+	{
+		element: <AuthLayout />,
+		children: [
+			{ path: '/login', element: <LoginPage /> },
+			{
+				path: '/',
+				element: (
+					<ProtectedRoute>
+						<Layout />
+					</ProtectedRoute>
+				),
+				children: [
+					{ index: true, element: <DashboardPage /> },
+					{ path: 'time', element: <TimePage /> },
+					{ path: 'projects', element: <ProjectsPage /> },
+					{ path: 'projects/new', element: <ProjectFormPage /> },
+					{ path: 'projects/:id', element: <ProjectFormPage /> },
+					{ path: 'reports', element: <ReportsPage /> },
+					{ path: 'api-settings', element: <ApiSettingsPage /> },
+					{ path: 'more', element: <MorePage /> },
+				],
+			},
+			{ path: '*', element: <Navigate to="/" replace /> },
+		],
+	},
+])
+
+function App() {
+	return <RouterProvider router={router} />
 }
 
 export default App

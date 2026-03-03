@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from 'react'
+import { useBlocker } from 'react-router-dom'
 import { UnsavedChangesBar } from '../components/UnsavedChangesBar'
 import { Button } from '../components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card'
@@ -48,6 +49,37 @@ export function TimePage() {
 
 	const weekDays = getWeekDays(weekStart)
 	const weekNumber = getWeekNumber(weekStart)
+
+	// Warn on browser/tab close with unsaved changes
+	useEffect(() => {
+		const handleBeforeUnload = (e: BeforeUnloadEvent) => {
+			if (hasChanges) {
+				e.preventDefault()
+				e.returnValue = ''
+			}
+		}
+		window.addEventListener('beforeunload', handleBeforeUnload)
+		return () => window.removeEventListener('beforeunload', handleBeforeUnload)
+	}, [hasChanges])
+
+	// Block in-app navigation with unsaved changes
+	const blocker = useBlocker(
+		({ currentLocation, nextLocation }) =>
+			hasChanges && currentLocation.pathname !== nextLocation.pathname,
+	)
+
+	useEffect(() => {
+		if (blocker.state === 'blocked') {
+			const confirmed = window.confirm(
+				'Du har osparade ändringar. Vill du lämna sidan utan att spara?',
+			)
+			if (confirmed) {
+				blocker.proceed()
+			} else {
+				blocker.reset()
+			}
+		}
+	}, [blocker])
 
 	const loadData = useCallback(async () => {
 		setIsLoading(true)
