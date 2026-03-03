@@ -1,5 +1,24 @@
 const BOX_API_URL = 'https://api.box.developersbay.se/api/v1/graphql'
 
+const MONTH_NAMES = [
+	'January',
+	'February',
+	'March',
+	'April',
+	'May',
+	'June',
+	'July',
+	'August',
+	'September',
+	'October',
+	'November',
+	'December',
+] as const
+
+function getMonthName(month: number): string {
+	return MONTH_NAMES[month - 1]
+}
+
 export interface BoxTimeReportEntry {
 	id: string
 	type: string
@@ -126,9 +145,19 @@ export async function getTimeReports(
 	month: number,
 ): Promise<BoxTimeReport[]> {
 	const data = await fetchBoxGraphQL<{
-		timeReports: BoxTimeReport[]
-	}>(token, GET_TIME_REPORTS_QUERY, { year, month })
-	return data.timeReports
+		timeReports: {
+			edges: Array<{
+				node: BoxTimeReport
+			}>
+		}
+	}>(token, GET_TIME_REPORTS_QUERY, {
+		first: 100,
+		filters: {
+			year: { value: year, label: year.toString() },
+			month: { value: month, label: getMonthName(month) },
+		},
+	})
+	return data.timeReports.edges.map((edge) => edge.node)
 }
 
 export async function getSingleTimeReport(
