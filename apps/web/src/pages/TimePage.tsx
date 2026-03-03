@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from 'react'
+import { UnsavedChangesBar } from '../components/UnsavedChangesBar'
 import { Button } from '../components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card'
 import { Input } from '../components/ui/input'
@@ -43,6 +44,7 @@ export function TimePage() {
 	const [isLoading, setIsLoading] = useState(true)
 	const [isSaving, setIsSaving] = useState(false)
 	const [hasChanges, setHasChanges] = useState(false)
+	const [showActionBar, setShowActionBar] = useState(false)
 
 	const weekDays = getWeekDays(weekStart)
 	const weekNumber = getWeekNumber(weekStart)
@@ -91,6 +93,7 @@ export function TimePage() {
 			}
 
 			setHasChanges(false)
+			setShowActionBar(false)
 		} catch (error) {
 			console.error('Failed to load data:', error)
 		} finally {
@@ -142,6 +145,12 @@ export function TimePage() {
 			return newData
 		})
 		setHasChanges(true)
+	}
+
+	const handleTimeBlur = () => {
+		if (hasChanges) {
+			setShowActionBar(true)
+		}
 	}
 
 	const handleSave = async () => {
@@ -320,6 +329,7 @@ export function TimePage() {
 														e.target.value,
 													)
 												}
+												onBlur={handleTimeBlur}
 												className={cn(
 													'text-center h-12 text-lg',
 													redDay && 'bg-red-50 border-red-200',
@@ -406,6 +416,7 @@ export function TimePage() {
 																e.target.value,
 															)
 														}
+														onBlur={handleTimeBlur}
 														className={cn(
 															'text-center w-full',
 															redDay && 'border-red-200',
@@ -479,6 +490,13 @@ export function TimePage() {
 			>
 				{isSaving ? 'Sparar...' : 'Spara ändringar'}
 			</Button>
+
+			<UnsavedChangesBar
+				visible={showActionBar && hasChanges}
+				onCancel={() => setShowActionBar(false)}
+				onSave={handleSave}
+				isSaving={isSaving}
+			/>
 
 			{projects.length === 0 && (
 				<Card>
