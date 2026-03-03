@@ -55,6 +55,8 @@ async function createTestUserWithToken(
 			id,
 			email: `${id}@example.com`,
 			boxApiToken: token,
+			firstName: 'Test',
+			lastName: 'User',
 		},
 	})
 }
@@ -149,6 +151,32 @@ describe('POST /api/box/sync', () => {
 		const body = (await res.json()) as { success: boolean; error: string }
 		expect(body.error).toBe(
 			'BOX API token saknas - konfigurera i API inställningar',
+		)
+	})
+
+	it('returns 400 when user profile is incomplete', async () => {
+		await authDb.user.create({
+			data: {
+				id: 'no-profile-user',
+				email: 'no-profile@example.com',
+				boxApiToken: 'box-api-token-123',
+			},
+		})
+		await authenticateRequest('no-profile-user')
+
+		const res = await app.request('/api/box/sync', {
+			method: 'POST',
+			headers: {
+				Authorization: 'Bearer valid-token',
+				'Content-Type': 'application/json',
+			},
+			body: JSON.stringify({ year: 2024, month: 3 }),
+		})
+		expect(res.status).toBe(400)
+
+		const body = (await res.json()) as { success: boolean; error: string }
+		expect(body.error).toBe(
+			'Profil saknas - konfigurera för- och efternamn i Mer-sektionen innan du skickar till BOX',
 		)
 	})
 
