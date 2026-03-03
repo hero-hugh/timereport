@@ -94,29 +94,39 @@ describe('fetchBoxGraphQL', () => {
 
 describe('getTimeReports', () => {
 	it('returns time reports for year and month', async () => {
-		const reports = [
-			{
-				id: 'r1',
-				date: '2026-03-01',
-				totalHours: '160:00',
-				timeReportEntries: [
-					{
-						id: 'e1',
-						type: 'common',
-						date: '2026-03-01',
-						hours: '08:00',
-						comment: 'Work',
-					},
-				],
+		const report = {
+			id: 'r1',
+			date: '2026-03-01',
+			totalHours: '160:00',
+			timeReportEntries: [
+				{
+					id: 'e1',
+					type: 'common',
+					date: '2026-03-01',
+					hours: '08:00',
+					comment: 'Work',
+				},
+			],
+		}
+		mockFetchResponse({
+			data: {
+				timeReports: {
+					edges: [{ node: report }],
+				},
 			},
-		]
-		mockFetchResponse({ data: { timeReports: reports } })
+		})
 
 		const result = await getTimeReports('token', 2026, 3)
-		expect(result).toEqual(reports)
+		expect(result).toEqual([report])
 
 		const body = JSON.parse(fetchMock.mock.calls[0][1].body)
-		expect(body.variables).toEqual({ year: 2026, month: 3 })
+		expect(body.variables).toEqual({
+			first: 100,
+			filters: {
+				year: { value: 2026, label: '2026' },
+				month: { value: 3, label: 'March' },
+			},
+		})
 	})
 })
 

@@ -1,5 +1,24 @@
 const BOX_API_URL = 'https://api.box.developersbay.se/api/v1/graphql'
 
+const MONTH_NAMES = [
+	'January',
+	'February',
+	'March',
+	'April',
+	'May',
+	'June',
+	'July',
+	'August',
+	'September',
+	'October',
+	'November',
+	'December',
+] as const
+
+function getMonthName(month: number): string {
+	return MONTH_NAMES[month - 1]
+}
+
 export interface BoxTimeReportEntry {
 	id: string
 	type: string
@@ -13,6 +32,29 @@ export interface BoxTimeReport {
 	date: string
 	totalHours: string
 	timeReportEntries: BoxTimeReportEntry[]
+}
+
+export interface PageInfo {
+	currentPage: number
+	hasPreviousPage: boolean
+	hasNextPage: boolean
+}
+
+export interface TimeReportNode {
+	id: string
+	date: string
+	usage: number
+	totalHours: string
+}
+
+export interface TimeReportEdge {
+	node: TimeReportNode
+}
+
+export interface TimeReportsResponse {
+	totalCount: number
+	edges: TimeReportEdge[]
+	pageInfo: PageInfo
 }
 
 interface BoxGraphQLResponse<T> {
@@ -66,17 +108,21 @@ export async function fetchBoxGraphQL<T>(
 }
 
 const GET_TIME_REPORTS_QUERY = `
-  query GetTimeReports($year: Int!, $month: Int!) {
-    timeReports(year: $year, month: $month) {
-      id
-      date
-      totalHours
-      timeReportEntries {
-        id
-        type
-        date
-        hours
-        comment
+  query GetTimeReports($first: Int!, $page: Int, $orderBy: [GetTimeReportsOrderByClause], $filters: GetTimeReportFilters) {
+    timeReports(first: $first, page: $page, orderBy: $orderBy, filters: $filters) {
+      totalCount
+      edges {
+        node {
+          id
+          date
+          usage
+          totalHours
+        }
+      }
+      pageInfo {
+        currentPage
+        hasPreviousPage
+        hasNextPage
       }
     }
   }
@@ -120,11 +166,17 @@ export async function getTimeReports(
 	token: string,
 	year: number,
 	month: number,
-): Promise<BoxTimeReport[]> {
+): Promise<TimeReportNode[]> {
 	const data = await fetchBoxGraphQL<{
-		timeReports: BoxTimeReport[]
-	}>(token, GET_TIME_REPORTS_QUERY, { year, month })
-	return data.timeReports
+		timeReports: TimeReportsResponse
+	}>(token, GET_TIME_REPORTS_QUERY, {
+		first: 100,
+		filters: {
+			year: { value: year, label: year.toString() },
+			month: { value: month, label: getMonthName(month) },
+		},
+	})
+	return data.timeReports.edges.map((edge) => edge.node)
 }
 
 export async function getSingleTimeReport(
