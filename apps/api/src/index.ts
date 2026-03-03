@@ -8,6 +8,7 @@ import holidays from './routes/holidays'
 import projects from './routes/projects'
 import reports from './routes/reports'
 import timeEntries from './routes/time-entries'
+import user from './routes/user'
 
 const app = new Hono()
 
@@ -32,6 +33,7 @@ app.route('/api/projects', projects)
 app.route('/api/time-entries', timeEntries)
 app.route('/api/reports', reports)
 app.route('/api/holidays', holidays)
+app.route('/api/user', user)
 
 // 404 handler
 app.notFound((c) => {
