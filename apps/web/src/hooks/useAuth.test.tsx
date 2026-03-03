@@ -49,7 +49,13 @@ describe('useAuth', () => {
 		})
 
 		it('should fetch user on mount', async () => {
-			const mockUser = { id: '1', email: 'test@example.com', name: 'Test User' }
+			const mockUser = {
+				id: '1',
+				email: 'test@example.com',
+				name: 'Test User',
+				firstName: null,
+				lastName: null,
+			}
 			mockApi.getMe.mockResolvedValue({
 				success: true,
 				data: mockUser,
@@ -99,7 +105,13 @@ describe('useAuth', () => {
 		})
 
 		it('should login successfully', async () => {
-			const mockUser = { id: '1', email: 'test@example.com', name: 'Test User' }
+			const mockUser = {
+				id: '1',
+				email: 'test@example.com',
+				name: 'Test User',
+				firstName: null,
+				lastName: null,
+			}
 			mockApi.verifyOtp.mockResolvedValue({
 				success: true,
 				data: { user: mockUser },
@@ -170,7 +182,13 @@ describe('useAuth', () => {
 
 	describe('logout', () => {
 		it('should logout and clear user', async () => {
-			const mockUser = { id: '1', email: 'test@example.com', name: 'Test User' }
+			const mockUser = {
+				id: '1',
+				email: 'test@example.com',
+				name: 'Test User',
+				firstName: null,
+				lastName: null,
+			}
 			mockApi.getMe.mockResolvedValue({
 				success: true,
 				data: mockUser,
@@ -199,11 +217,15 @@ describe('useAuth', () => {
 				id: '1',
 				email: 'test@example.com',
 				name: 'Initial',
+				firstName: null,
+				lastName: null,
 			}
 			const updatedUser = {
 				id: '1',
 				email: 'test@example.com',
 				name: 'Updated',
+				firstName: 'Test',
+				lastName: 'User',
 			}
 
 			mockApi.getMe

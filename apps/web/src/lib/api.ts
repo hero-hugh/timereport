@@ -73,7 +73,13 @@ class ApiClient {
 
 	async verifyOtp(email: string, code: string) {
 		return this.request<{
-			user: { id: string; email: string; name: string | null }
+			user: {
+				id: string
+				email: string
+				name: string | null
+				firstName: string | null
+				lastName: string | null
+			}
 		}>('/api/auth/verify-otp', {
 			method: 'POST',
 			body: JSON.stringify({ email, code }),
@@ -91,6 +97,8 @@ class ApiClient {
 			id: string
 			email: string
 			name: string | null
+			firstName: string | null
+			lastName: string | null
 			createdAt: string
 			updatedAt: string
 		}>('/api/auth/me')

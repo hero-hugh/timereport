@@ -12,6 +12,8 @@ interface User {
 	id: string
 	email: string
 	name: string | null
+	firstName: string | null
+	lastName: string | null
 }
 
 interface AuthContextType {
@@ -40,6 +42,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 					id: response.data.id,
 					email: response.data.email,
 					name: response.data.name,
+					firstName: response.data.firstName,
+					lastName: response.data.lastName,
 				})
 			} else {
 				setUser(null)
