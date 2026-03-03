@@ -253,12 +253,18 @@ export function ReportsPage() {
 							className={`rounded-lg border p-4 flex items-start justify-between gap-2 ${
 								boxResult.success
 									? 'bg-green-50 border-green-200 text-green-800'
-									: 'bg-red-50 border-red-200 text-red-800'
+									: boxResult.message.includes('Profil saknas')
+										? 'bg-amber-50 border-amber-300 text-amber-900'
+										: 'bg-red-50 border-red-200 text-red-800'
 							}`}
 						>
 							<p className="text-sm">
 								{boxResult.success ? '✓ ' : ''}
-								{boxResult.message}
+								{boxResult.message.includes('Profil saknas') ? (
+									<strong>{boxResult.message}</strong>
+								) : (
+									boxResult.message
+								)}
 							</p>
 							<button
 								type="button"

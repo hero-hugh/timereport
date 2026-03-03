@@ -46,10 +46,24 @@ export function DashboardPage() {
 		<div className="space-y-6">
 			<div>
 				<h1 className="text-2xl font-bold">
-					Hej{user?.name ? `, ${user.name}` : ''}! 👋
+					Hej{user?.firstName ? `, ${user.firstName}` : ''}! 👋
 				</h1>
 				<p className="text-muted-foreground">Här är en översikt av din tid</p>
 			</div>
+
+			{user && (!user.firstName || !user.lastName) && (
+				<Card className="border-blue-200 bg-blue-50">
+					<CardContent className="py-4">
+						<p className="text-sm text-blue-900">
+							Konfigurera din profil under{' '}
+							<Link to="/more" className="font-medium underline">
+								Mer
+							</Link>{' '}
+							för att kunna skicka tidrapporter till BOX.
+						</p>
+					</CardContent>
+				</Card>
+			)}
 
 			{/* Stats cards */}
 			<div className="grid gap-4 md:grid-cols-3">

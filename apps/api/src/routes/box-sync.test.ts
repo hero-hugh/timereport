@@ -55,6 +55,8 @@ async function createTestUserWithToken(
 			id,
 			email: `${id}@example.com`,
 			boxApiToken: token,
+			firstName: 'Test',
+			lastName: 'User',
 		},
 	})
 }
@@ -152,6 +154,32 @@ describe('POST /api/box/sync', () => {
 		)
 	})
 
+	it('returns 400 when user profile is incomplete', async () => {
+		await authDb.user.create({
+			data: {
+				id: 'no-profile-user',
+				email: 'no-profile@example.com',
+				boxApiToken: 'box-api-token-123',
+			},
+		})
+		await authenticateRequest('no-profile-user')
+
+		const res = await app.request('/api/box/sync', {
+			method: 'POST',
+			headers: {
+				Authorization: 'Bearer valid-token',
+				'Content-Type': 'application/json',
+			},
+			body: JSON.stringify({ year: 2024, month: 3 }),
+		})
+		expect(res.status).toBe(400)
+
+		const body = (await res.json()) as { success: boolean; error: string }
+		expect(body.error).toBe(
+			'Profil saknas - konfigurera för- och efternamn i Mer-sektionen innan du skickar till BOX',
+		)
+	})
+
 	it('returns 404 when no BOX report exists for the period', async () => {
 		await createTestUserWithToken()
 		await authenticateRequest()
@@ -227,9 +255,11 @@ describe('POST /api/box/sync', () => {
 
 		// Verify updateTimeReport was called with correct mapped entries
 		expect(vi.mocked(updateTimeReport)).toHaveBeenCalledOnce()
-		const [token, reportId, entries] = vi.mocked(updateTimeReport).mock.calls[0]
+		const [token, reportId, entries, user] =
+			vi.mocked(updateTimeReport).mock.calls[0]
 		expect(token).toBe('box-api-token-123')
 		expect(reportId).toBe('box-report-1')
+		expect(user).toEqual({ firstName: 'Test', lastName: 'User' })
 
 		// entry-1 (2024-03-11) → 08:00 from 480 minutes
 		expect(entries[0]).toEqual({

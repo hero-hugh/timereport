@@ -66,7 +66,12 @@ export class AuthService {
 		success: boolean
 		accessToken?: string
 		refreshToken?: string
-		user?: { id: string; email: string; name: string | null }
+		user?: {
+			id: string
+			email: string
+			firstName: string | null
+			lastName: string | null
+		}
 		error?: string
 	}> {
 		const normalizedEmail = email.toLowerCase().trim()
@@ -188,7 +193,8 @@ export class AuthService {
 			user: {
 				id: user.id,
 				email: user.email,
-				name: user.name,
+				firstName: user.firstName,
+				lastName: user.lastName,
 			},
 		}
 	}
@@ -271,7 +277,8 @@ export class AuthService {
 			select: {
 				id: true,
 				email: true,
-				name: true,
+				firstName: true,
+				lastName: true,
 				createdAt: true,
 				updatedAt: true,
 			},

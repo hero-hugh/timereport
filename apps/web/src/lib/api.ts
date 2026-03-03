@@ -73,7 +73,12 @@ class ApiClient {
 
 	async verifyOtp(email: string, code: string) {
 		return this.request<{
-			user: { id: string; email: string; name: string | null }
+			user: {
+				id: string
+				email: string
+				firstName: string | null
+				lastName: string | null
+			}
 		}>('/api/auth/verify-otp', {
 			method: 'POST',
 			body: JSON.stringify({ email, code }),
@@ -90,10 +95,24 @@ class ApiClient {
 		return this.request<{
 			id: string
 			email: string
-			name: string | null
+			firstName: string | null
+			lastName: string | null
 			createdAt: string
 			updatedAt: string
 		}>('/api/auth/me')
+	}
+
+	// Profile
+	async updateProfile(data: { firstName: string; lastName: string }) {
+		return this.request<{
+			id: string
+			email: string
+			firstName: string
+			lastName: string
+		}>('/api/user/profile', {
+			method: 'PATCH',
+			body: JSON.stringify(data),
+		})
 	}
 
 	// Projects

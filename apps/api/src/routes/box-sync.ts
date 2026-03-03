@@ -60,7 +60,7 @@ boxSync.post('/sync', async (c) => {
 	// 1. Get user's BOX API token
 	const dbUser = await authDb.user.findUnique({
 		where: { id: userId },
-		select: { boxApiToken: true },
+		select: { boxApiToken: true, firstName: true, lastName: true },
 	})
 
 	if (!dbUser?.boxApiToken) {
@@ -68,6 +68,17 @@ boxSync.post('/sync', async (c) => {
 			{
 				success: false,
 				error: 'BOX API token saknas - konfigurera i API inställningar',
+			},
+			400,
+		)
+	}
+
+	if (!dbUser.firstName || !dbUser.lastName) {
+		return c.json(
+			{
+				success: false,
+				error:
+					'Profil saknas - konfigurera för- och efternamn i Mer-sektionen innan du skickar till BOX',
 			},
 			400,
 		)
@@ -192,7 +203,10 @@ boxSync.post('/sync', async (c) => {
 
 	// 7. Update the BOX report
 	try {
-		await updateTimeReport(token, boxReport.id, updatedEntries)
+		await updateTimeReport(token, boxReport.id, updatedEntries, {
+			firstName: dbUser.firstName,
+			lastName: dbUser.lastName,
+		})
 	} catch (error) {
 		if (error instanceof BoxApiError) {
 			console.error('BOX API error updating time report:', error.message)

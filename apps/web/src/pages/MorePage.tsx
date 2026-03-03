@@ -1,36 +1,61 @@
+import { useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
+import { ProfileEditDialog } from '../components/ProfileEditDialog'
 import { Button } from '../components/ui/button'
 import { Card, CardContent } from '../components/ui/card'
 import { useAuth } from '../hooks/useAuth'
 
 export function MorePage() {
-	const { user, logout } = useAuth()
+	const { user, logout, refreshUser } = useAuth()
 	const navigate = useNavigate()
+	const [profileDialogOpen, setProfileDialogOpen] = useState(false)
 
 	const handleLogout = async () => {
 		await logout()
 		navigate('/login')
 	}
 
+	const profileName =
+		user?.firstName && user?.lastName
+			? `${user.firstName} ${user.lastName}`
+			: null
+
 	return (
 		<div className="space-y-4">
 			<h1 className="text-2xl font-bold">Mer</h1>
 
 			<Card>
-				<CardContent className="p-4">
-					<div className="flex items-center gap-3">
-						<div className="w-12 h-12 bg-primary/10 rounded-full flex items-center justify-center text-xl">
-							👤
+				<CardContent className="p-0">
+					<button
+						type="button"
+						className="w-full text-left p-4 hover:bg-muted/50 transition-colors"
+						onClick={() => setProfileDialogOpen(true)}
+					>
+						<div className="flex items-center gap-3">
+							<div className="w-12 h-12 bg-primary/10 rounded-full flex items-center justify-center text-xl">
+								👤
+							</div>
+							<div className="flex-1">
+								<p className="font-medium">{user?.email}</p>
+								<p className="text-sm text-muted-foreground">
+									{profileName || 'Ingen profil konfigurerad'}
+								</p>
+							</div>
+							<span className="text-sm text-muted-foreground">
+								Redigera profil →
+							</span>
 						</div>
-						<div>
-							<p className="font-medium">{user?.email}</p>
-							<p className="text-sm text-muted-foreground">
-								{user?.name || 'Ingen profil konfigurerad'}
-							</p>
-						</div>
-					</div>
+					</button>
 				</CardContent>
 			</Card>
+
+			<ProfileEditDialog
+				open={profileDialogOpen}
+				onClose={() => setProfileDialogOpen(false)}
+				onSaved={refreshUser}
+				initialFirstName={user?.firstName}
+				initialLastName={user?.lastName}
+			/>
 
 			<Card>
 				<CardContent className="p-0">

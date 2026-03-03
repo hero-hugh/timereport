@@ -215,6 +215,7 @@ export async function updateTimeReport(
 	token: string,
 	reportId: string,
 	entries: UpdateTimeReportEntryInput[],
+	user: { firstName: string; lastName: string },
 ): Promise<BoxTimeReport> {
 	const data = await fetchBoxGraphQL<{
 		updateTimeReport: BoxTimeReport
@@ -222,6 +223,8 @@ export async function updateTimeReport(
 		id: reportId,
 		input: {
 			timeReportEntries: entries,
+			firstName: user.firstName,
+			lastName: user.lastName,
 			supplierInvoiceNumber: null,
 		},
 	})
