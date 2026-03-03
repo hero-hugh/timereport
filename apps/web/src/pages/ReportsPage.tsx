@@ -24,6 +24,7 @@ export function ReportsPage() {
 	const [summary, setSummary] = useState<ReportSummary | null>(null)
 	const [isLoading, setIsLoading] = useState(true)
 	const [isExporting, setIsExporting] = useState(false)
+	const [isSendingToBox, setIsSendingToBox] = useState(false)
 
 	useEffect(() => {
 		async function loadReport() {
@@ -85,6 +86,19 @@ export function ReportsPage() {
 			}
 		} finally {
 			setIsExporting(false)
+		}
+	}
+
+	const handleSendToBox = async () => {
+		if (!summary) return
+		setIsSendingToBox(true)
+		try {
+			const [yearStr, monthStr] = summary.period.from.split('-')
+			const year = Number(yearStr)
+			const month = Number(monthStr)
+			await api.sendToBox({ year, month })
+		} finally {
+			setIsSendingToBox(false)
 		}
 	}
 
@@ -187,13 +201,22 @@ export function ReportsPage() {
 						</CardContent>
 					</Card>
 
-					<Button
-						className="w-full"
-						onClick={handleExportPdf}
-						disabled={isExporting}
-					>
-						{isExporting ? 'Exporterar...' : 'Exportera till PDF'}
-					</Button>
+					<div className="flex flex-col gap-2">
+						<Button
+							className="w-full"
+							onClick={handleExportPdf}
+							disabled={isExporting}
+						>
+							{isExporting ? 'Exporterar...' : 'Exportera till PDF'}
+						</Button>
+						<Button
+							className="w-full"
+							onClick={handleSendToBox}
+							disabled={isSendingToBox}
+						>
+							{isSendingToBox ? 'Skickar...' : 'Skicka till BOX'}
+						</Button>
+					</div>
 				</>
 			)}
 		</div>

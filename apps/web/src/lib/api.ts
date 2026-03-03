@@ -312,6 +312,13 @@ class ApiClient {
 		})
 	}
 
+	async sendToBox(params: { year: number; month: number }) {
+		return this.request<{ message: string }>('/api/box/sync', {
+			method: 'POST',
+			body: JSON.stringify(params),
+		})
+	}
+
 	// Holidays
 	async getHolidays(params: { from: string; to: string }) {
 		const query = new URLSearchParams({
