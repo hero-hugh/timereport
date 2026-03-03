@@ -255,9 +255,11 @@ describe('POST /api/box/sync', () => {
 
 		// Verify updateTimeReport was called with correct mapped entries
 		expect(vi.mocked(updateTimeReport)).toHaveBeenCalledOnce()
-		const [token, reportId, entries] = vi.mocked(updateTimeReport).mock.calls[0]
+		const [token, reportId, entries, user] =
+			vi.mocked(updateTimeReport).mock.calls[0]
 		expect(token).toBe('box-api-token-123')
 		expect(reportId).toBe('box-report-1')
+		expect(user).toEqual({ firstName: 'Test', lastName: 'User' })
 
 		// entry-1 (2024-03-11) → 08:00 from 480 minutes
 		expect(entries[0]).toEqual({
