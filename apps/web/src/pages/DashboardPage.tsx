@@ -46,7 +46,7 @@ export function DashboardPage() {
 		<div className="space-y-6">
 			<div>
 				<h1 className="text-2xl font-bold">
-					Hej{user?.name ? `, ${user.name}` : ''}! 👋
+					Hej{user?.firstName ? `, ${user.firstName}` : ''}! 👋
 				</h1>
 				<p className="text-muted-foreground">Här är en översikt av din tid</p>
 			</div>

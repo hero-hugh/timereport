@@ -52,7 +52,6 @@ describe('useAuth', () => {
 			const mockUser = {
 				id: '1',
 				email: 'test@example.com',
-				name: 'Test User',
 				firstName: null,
 				lastName: null,
 			}
@@ -108,7 +107,6 @@ describe('useAuth', () => {
 			const mockUser = {
 				id: '1',
 				email: 'test@example.com',
-				name: 'Test User',
 				firstName: null,
 				lastName: null,
 			}
@@ -185,7 +183,6 @@ describe('useAuth', () => {
 			const mockUser = {
 				id: '1',
 				email: 'test@example.com',
-				name: 'Test User',
 				firstName: null,
 				lastName: null,
 			}
@@ -216,14 +213,12 @@ describe('useAuth', () => {
 			const initialUser = {
 				id: '1',
 				email: 'test@example.com',
-				name: 'Initial',
 				firstName: null,
 				lastName: null,
 			}
 			const updatedUser = {
 				id: '1',
 				email: 'test@example.com',
-				name: 'Updated',
 				firstName: 'Test',
 				lastName: 'User',
 			}
@@ -235,14 +230,14 @@ describe('useAuth', () => {
 			const { result } = renderHook(() => useAuth(), { wrapper })
 
 			await waitFor(() => {
-				expect(result.current.user?.name).toBe('Initial')
+				expect(result.current.user?.firstName).toBeNull()
 			})
 
 			await act(async () => {
 				await result.current.refreshUser()
 			})
 
-			expect(result.current.user?.name).toBe('Updated')
+			expect(result.current.user?.firstName).toBe('Test')
 		})
 	})
 

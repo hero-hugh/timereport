@@ -69,7 +69,6 @@ export class AuthService {
 		user?: {
 			id: string
 			email: string
-			name: string | null
 			firstName: string | null
 			lastName: string | null
 		}
@@ -194,7 +193,6 @@ export class AuthService {
 			user: {
 				id: user.id,
 				email: user.email,
-				name: user.name,
 				firstName: user.firstName,
 				lastName: user.lastName,
 			},
@@ -279,7 +277,6 @@ export class AuthService {
 			select: {
 				id: true,
 				email: true,
-				name: true,
 				firstName: true,
 				lastName: true,
 				createdAt: true,

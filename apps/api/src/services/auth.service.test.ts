@@ -185,7 +185,11 @@ describe('AuthService', () => {
 		it('should login existing user', async () => {
 			// Skapa användare först
 			const user = await authDb.user.create({
-				data: { email: 'existing@example.com', name: 'Existing User' },
+				data: {
+					email: 'existing@example.com',
+					firstName: 'Existing',
+					lastName: 'User',
+				},
 			})
 
 			const { hashOtpCode, getOtpExpiry } = await import('../lib/otp')
@@ -204,7 +208,7 @@ describe('AuthService', () => {
 
 			expect(result.success).toBe(true)
 			expect(result.user?.id).toBe(user.id)
-			expect(result.user?.name).toBe('Existing User')
+			expect(result.user?.firstName).toBe('Existing')
 		})
 
 		it('should return error for expired OTP', async () => {
