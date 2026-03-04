@@ -17,50 +17,56 @@ const UnsavedChangesBar = React.forwardRef<
 		<div
 			ref={ref}
 			className={cn(
-				'fixed bottom-0 left-0 right-0 z-50 transition-transform duration-300 ease-out',
-				visible ? 'translate-y-0' : 'translate-y-full',
+				'fixed bottom-4 left-0 right-0 z-50 flex justify-center pointer-events-none transition-all duration-300 ease-out',
+				'px-4',
+				visible
+					? 'translate-y-0 opacity-100'
+					: 'translate-y-full opacity-0',
 			)}
 		>
-			{/* Desktop (≥768px): Fixed bottom bar */}
-			<div className="hidden md:block border-t-2 border-amber-300 bg-amber-50/95 shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.1)] backdrop-blur-sm">
-				<div className="mx-auto flex max-w-7xl items-center justify-between p-4">
-					<p className="text-sm font-medium text-amber-800">
-						Du har osparade ändringar - ändringar måste sparas
-					</p>
-					<div className="flex items-center gap-3">
-						<Button variant="outline" onClick={onCancel} disabled={isSaving}>
-							Avbryt
-						</Button>
-						<Button onClick={onSave} disabled={isSaving}>
-							{isSaving ? 'Sparar...' : 'Spara'}
-						</Button>
-					</div>
-				</div>
-			</div>
+			<div
+				className={cn(
+					'pointer-events-auto flex items-center gap-4 rounded-2xl bg-white px-5 py-3 shadow-lg ring-1 ring-black/5',
+					'max-w-2xl w-full md:w-auto',
+				)}
+			>
+				{/* Warning icon */}
+				<span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-amber-100 text-amber-600">
+					<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="h-5 w-5">
+						<path fillRule="evenodd" d="M8.485 2.495c.673-1.167 2.357-1.167 3.03 0l6.28 10.875c.673 1.167-.17 2.625-1.516 2.625H3.72c-1.347 0-2.189-1.458-1.515-2.625L8.485 2.495zM10 6a.75.75 0 01.75.75v3.5a.75.75 0 01-1.5 0v-3.5A.75.75 0 0110 6zm0 9a1 1 0 100-2 1 1 0 000 2z" clipRule="evenodd" />
+					</svg>
+				</span>
 
-			{/* Mobile (<768px): Overlay style */}
-			<div className="md:hidden border-t-2 border-amber-300 bg-amber-50/95 shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.1)] backdrop-blur-sm">
-				<div className="flex flex-col items-center gap-3 p-4">
-					<p className="text-sm font-medium text-amber-800 text-center">
-						Du har osparade ändringar - ändringar måste sparas
-					</p>
-					<div className="flex w-full items-center gap-3">
-						<Button
-							variant="outline"
-							className="min-h-[44px] flex-1"
-							onClick={onCancel}
-							disabled={isSaving}
-						>
-							Avbryt
-						</Button>
-						<Button
-							className="min-h-[44px] flex-1"
-							onClick={onSave}
-							disabled={isSaving}
-						>
-							{isSaving ? 'Sparar...' : 'Spara'}
-						</Button>
-					</div>
+				{/* Text */}
+				<p className="flex-1 text-sm text-gray-600 min-w-0">
+					<span className="font-bold text-gray-800">
+						Du har osparade ändringar
+					</span>
+					<span className="hidden sm:inline">
+						{' '}
+						&mdash; ändringar måste sparas
+					</span>
+				</p>
+
+				{/* Buttons */}
+				<div className="flex shrink-0 items-center gap-2">
+					<Button
+						variant="outline"
+						size="sm"
+						className="rounded-lg border-gray-200 bg-white px-4 text-gray-700 hover:bg-gray-50"
+						onClick={onCancel}
+						disabled={isSaving}
+					>
+						Avbryt
+					</Button>
+					<Button
+						size="sm"
+						className="rounded-lg bg-indigo-500 px-5 text-white hover:bg-indigo-600"
+						onClick={onSave}
+						disabled={isSaving}
+					>
+						{isSaving ? 'Sparar...' : 'Spara'}
+					</Button>
 				</div>
 			</div>
 		</div>

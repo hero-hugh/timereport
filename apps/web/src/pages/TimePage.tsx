@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import { useBlocker } from 'react-router-dom'
 import { UnsavedChangesBar } from '../components/UnsavedChangesBar'
+import { UnsavedChangesDialog } from '../components/UnsavedChangesDialog'
 import { Button } from '../components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card'
 import { Input } from '../components/ui/input'
@@ -46,6 +47,7 @@ export function TimePage() {
 	const [isSaving, setIsSaving] = useState(false)
 	const [hasChanges, setHasChanges] = useState(false)
 	const [showActionBar, setShowActionBar] = useState(false)
+	const [pendingWeekStart, setPendingWeekStart] = useState<Date | null>(null)
 
 	const weekDays = getWeekDays(weekStart)
 	const weekNumber = getWeekNumber(weekStart)
@@ -68,18 +70,9 @@ export function TimePage() {
 			hasChanges && currentLocation.pathname !== nextLocation.pathname,
 	)
 
-	useEffect(() => {
-		if (blocker.state === 'blocked') {
-			const confirmed = window.confirm(
-				'Du har osparade ändringar. Vill du lämna sidan utan att spara?',
-			)
-			if (confirmed) {
-				blocker.proceed()
-			} else {
-				blocker.reset()
-			}
-		}
-	}, [blocker])
+	const isNavigationBlocked = blocker.state === 'blocked'
+	const isWeekChangeBlocked = pendingWeekStart !== null
+	const showUnsavedDialog = isNavigationBlocked || isWeekChangeBlocked
 
 	const loadData = useCallback(async () => {
 		setIsLoading(true)
@@ -137,20 +130,28 @@ export function TimePage() {
 		loadData()
 	}, [loadData])
 
+	const changeWeek = (newStart: Date) => {
+		if (hasChanges) {
+			setPendingWeekStart(newStart)
+		} else {
+			setWeekStart(newStart)
+		}
+	}
+
 	const handlePrevWeek = () => {
 		const newStart = new Date(weekStart)
 		newStart.setDate(newStart.getDate() - 7)
-		setWeekStart(newStart)
+		changeWeek(newStart)
 	}
 
 	const handleNextWeek = () => {
 		const newStart = new Date(weekStart)
 		newStart.setDate(newStart.getDate() + 7)
-		setWeekStart(newStart)
+		changeWeek(newStart)
 	}
 
 	const handleToday = () => {
-		setWeekStart(getWeekStart(new Date()))
+		changeWeek(getWeekStart(new Date()))
 	}
 
 	// Check if we're on the current week
@@ -519,6 +520,27 @@ export function TimePage() {
 				onCancel={() => setShowActionBar(false)}
 				onSave={handleSave}
 				isSaving={isSaving}
+			/>
+
+			<UnsavedChangesDialog
+				open={showUnsavedDialog}
+				onCancel={() => {
+					if (isNavigationBlocked) {
+						blocker.reset?.()
+					}
+					setPendingWeekStart(null)
+				}}
+				onDiscard={() => {
+					if (isNavigationBlocked) {
+						blocker.proceed?.()
+					}
+					if (pendingWeekStart) {
+						setHasChanges(false)
+						setShowActionBar(false)
+						setWeekStart(pendingWeekStart)
+						setPendingWeekStart(null)
+					}
+				}}
 			/>
 
 			{projects.length === 0 && (
