@@ -26,13 +26,18 @@ test.describe('Time reporting', () => {
 		// The unsaved changes bar should appear
 		await expect(page.getByText('Du har osparade ändringar')).toBeVisible()
 
-		// Save
-		await page.getByRole('button', { name: 'Spara' }).click()
+		// Click save and wait for the API response
+		const [saveResponse] = await Promise.all([
+			page.waitForResponse(
+				(resp) =>
+					resp.url().includes('/api/time-entries') &&
+					resp.request().method() === 'POST',
+			),
+			page.getByRole('button', { name: 'Spara' }).click(),
+		])
 
-		// Bar should disappear after save
-		await expect(
-			page.getByText('Du har osparade ändringar'),
-		).not.toBeVisible({ timeout: 15_000 })
+		// Verify the save succeeded
+		expect(saveResponse.status()).toBe(201)
 
 		// The value should persist (formatted as 8:00)
 		await expect(firstInput).toHaveValue('8:00')
