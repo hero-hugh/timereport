@@ -1,3 +1,4 @@
+import { Check, X } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { Button } from '../components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card'
@@ -135,7 +136,7 @@ export function ReportsPage() {
 	if (isLoading) {
 		return (
 			<div className="flex items-center justify-center h-64">
-				<p className="text-muted-foreground">Laddar...</p>
+				<p className="text-muted-foreground animate-pulse">Laddar...</p>
 			</div>
 		)
 	}
@@ -166,7 +167,7 @@ export function ReportsPage() {
 
 			{summary && (
 				<>
-					<Card>
+					<Card className="animate-fade-in-up">
 						<CardHeader className="pb-2">
 							<CardTitle className="text-lg">
 								Totalt - {getPeriodLabel()}
@@ -190,7 +191,7 @@ export function ReportsPage() {
 						</CardContent>
 					</Card>
 
-					<Card>
+					<Card className="animate-fade-in-up stagger-1">
 						<CardHeader>
 							<CardTitle className="text-lg">Per projekt</CardTitle>
 						</CardHeader>
@@ -250,16 +251,16 @@ export function ReportsPage() {
 
 					{boxResult && (
 						<div
-							className={`rounded-lg border p-4 flex items-start justify-between gap-2 ${
+							className={`animate-slide-in-bottom rounded-lg border p-4 flex items-start justify-between gap-2 ${
 								boxResult.success
-									? 'bg-green-50 border-green-200 text-green-800'
+									? 'bg-green-50 dark:bg-green-950/30 border-green-200 dark:border-green-800/40 text-green-800 dark:text-green-300'
 									: boxResult.message.includes('Profil saknas')
-										? 'bg-amber-50 border-amber-300 text-amber-900'
-										: 'bg-red-50 border-red-200 text-red-800'
+										? 'bg-amber-50 dark:bg-amber-950/30 border-amber-300 dark:border-amber-800/40 text-amber-900 dark:text-amber-300'
+										: 'bg-red-50 dark:bg-red-950/30 border-red-200 dark:border-red-800/40 text-red-800 dark:text-red-300'
 							}`}
 						>
-							<p className="text-sm">
-								{boxResult.success ? '✓ ' : ''}
+							<p className="text-sm flex items-center gap-1">
+								{boxResult.success && <Check className="h-4 w-4" />}
 								{boxResult.message.includes('Profil saknas') ? (
 									<strong>{boxResult.message}</strong>
 								) : (
@@ -268,10 +269,10 @@ export function ReportsPage() {
 							</p>
 							<button
 								type="button"
-								className="text-sm font-medium hover:opacity-70"
+								className="hover:opacity-70"
 								onClick={() => setBoxResult(null)}
 							>
-								×
+								<X className="h-4 w-4" />
 							</button>
 						</div>
 					)}

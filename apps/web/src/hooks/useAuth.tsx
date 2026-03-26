@@ -55,6 +55,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 		refreshUser().finally(() => setIsLoading(false))
 	}, [refreshUser])
 
+	useEffect(() => {
+		const handleSessionExpired = () => setUser(null)
+		window.addEventListener('auth:session-expired', handleSessionExpired)
+		return () =>
+			window.removeEventListener('auth:session-expired', handleSessionExpired)
+	}, [])
+
 	const login = async (
 		email: string,
 		code: string,

@@ -1,3 +1,4 @@
+import { Loader2 } from 'lucide-react'
 import { Navigate } from 'react-router-dom'
 import { useAuth } from '../hooks/useAuth'
 
@@ -12,7 +13,7 @@ export function ProtectedRoute({ children }: ProtectedRouteProps) {
 		return (
 			<div className="min-h-screen flex items-center justify-center">
 				<div className="text-center">
-					<div className="text-4xl mb-4">⏱</div>
+					<Loader2 className="h-8 w-8 animate-spin mx-auto mb-4 text-muted-foreground" />
 					<p className="text-muted-foreground">Laddar...</p>
 				</div>
 			</div>

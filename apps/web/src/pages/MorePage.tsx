@@ -1,3 +1,4 @@
+import { BarChart3, ChevronRight, Key, LogOut, User } from 'lucide-react'
 import { useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { ProfileEditDialog } from '../components/ProfileEditDialog'
@@ -24,7 +25,7 @@ export function MorePage() {
 		<div className="space-y-4">
 			<h1 className="text-2xl font-bold">Mer</h1>
 
-			<Card>
+			<Card className="animate-fade-in-up">
 				<CardContent className="p-0">
 					<button
 						type="button"
@@ -32,8 +33,8 @@ export function MorePage() {
 						onClick={() => setProfileDialogOpen(true)}
 					>
 						<div className="flex items-center gap-3">
-							<div className="w-12 h-12 shrink-0 bg-primary/10 rounded-full flex items-center justify-center text-xl">
-								👤
+							<div className="w-12 h-12 shrink-0 bg-primary/10 rounded-full flex items-center justify-center">
+								<User className="h-6 w-6 text-primary" />
 							</div>
 							<div className="flex-1 min-w-0">
 								<p className="font-medium truncate">{user?.email}</p>
@@ -57,39 +58,40 @@ export function MorePage() {
 				initialLastName={user?.lastName}
 			/>
 
-			<Card>
+			<Card className="animate-fade-in-up stagger-1">
 				<CardContent className="p-0">
 					<Link
 						to="/reports"
-						className="flex items-center justify-between p-4 hover:bg-muted/50 transition-colors"
+						className="flex items-center justify-between p-4 hover:bg-muted/50 transition-all duration-150 ease-out-expo active:scale-[0.98]"
 					>
 						<div className="flex items-center gap-3">
-							<span className="text-xl">📊</span>
+							<BarChart3 className="h-5 w-5" />
 							<span>Rapporter</span>
 						</div>
-						<span className="text-muted-foreground">→</span>
+						<ChevronRight className="h-5 w-5 text-muted-foreground" />
 					</Link>
 				</CardContent>
 			</Card>
 
-			<Card>
+			<Card className="animate-fade-in-up stagger-2">
 				<CardContent className="p-0">
 					<Link
 						to="/api-settings"
-						className="flex items-center justify-between p-4 hover:bg-muted/50 transition-colors"
+						className="flex items-center justify-between p-4 hover:bg-muted/50 transition-all duration-150 ease-out-expo active:scale-[0.98]"
 					>
 						<div className="flex items-center gap-3">
-							<span className="text-xl">🔑</span>
+							<Key className="h-5 w-5" />
 							<span>API inställningar</span>
 						</div>
-						<span className="text-muted-foreground">→</span>
+						<ChevronRight className="h-5 w-5 text-muted-foreground" />
 					</Link>
 				</CardContent>
 			</Card>
 
-			<div className="pt-4">
+			<div className="pt-4 animate-fade-in-up stagger-3">
 				<Button variant="outline" className="w-full" onClick={handleLogout}>
-					🚪 Logga ut
+					<LogOut className="h-4 w-4 mr-2" />
+					Logga ut
 				</Button>
 			</div>
 

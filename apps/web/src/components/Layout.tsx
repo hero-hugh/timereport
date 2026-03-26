@@ -1,12 +1,19 @@
+import {
+	Clock,
+	FolderOpen,
+	LayoutDashboard,
+	type LucideIcon,
+	Menu,
+} from 'lucide-react'
 import { NavLink, Outlet, useNavigate } from 'react-router-dom'
 import { useAuth } from '../hooks/useAuth'
 import { cn } from '../lib/utils'
 
-const navItems = [
-	{ to: '/', label: 'Hem', icon: '📊' },
-	{ to: '/time', label: 'Tid', icon: '⏱️' },
-	{ to: '/projects', label: 'Projekt', icon: '📁' },
-	{ to: '/more', label: 'Mer', icon: '⚙️' },
+const navItems: { to: string; label: string; icon: LucideIcon }[] = [
+	{ to: '/', label: 'Hem', icon: LayoutDashboard },
+	{ to: '/time', label: 'Tid', icon: Clock },
+	{ to: '/projects', label: 'Projekt', icon: FolderOpen },
+	{ to: '/more', label: 'Mer', icon: Menu },
 ]
 
 export function Layout() {
@@ -24,7 +31,7 @@ export function Layout() {
 			<aside className="hidden md:flex md:w-64 md:flex-col md:fixed md:inset-y-0 border-r bg-card">
 				<div className="flex flex-col flex-1 min-h-0">
 					<div className="flex items-center h-16 px-4 border-b">
-						<span className="text-2xl mr-2">⏱</span>
+						<Clock className="h-6 w-6 mr-2" />
 						<span className="font-semibold">Tidrapport</span>
 					</div>
 					<nav className="flex-1 px-2 py-4 space-y-1">
@@ -34,14 +41,14 @@ export function Layout() {
 								to={item.to}
 								className={({ isActive }) =>
 									cn(
-										'flex items-center px-3 py-2 text-sm font-medium rounded-md transition-colors',
+										'flex items-center px-3 py-2 text-sm font-medium rounded-md transition-all duration-150 ease-out-expo active:scale-[0.97]',
 										isActive
 											? 'bg-primary text-primary-foreground'
 											: 'text-muted-foreground hover:bg-muted hover:text-foreground',
 									)
 								}
 							>
-								<span className="mr-3">{item.icon}</span>
+								<item.icon className="h-5 w-5 mr-3" />
 								{item.label}
 							</NavLink>
 						))}
@@ -67,7 +74,7 @@ export function Layout() {
 				<header className="md:hidden sticky top-0 z-10 bg-background border-b">
 					<div className="flex items-center justify-between h-14 px-4">
 						<div className="flex items-center">
-							<span className="text-xl mr-2">⏱</span>
+							<Clock className="h-5 w-5 mr-2" />
 							<span className="font-semibold">Tidrapport</span>
 						</div>
 					</div>
@@ -75,7 +82,9 @@ export function Layout() {
 
 				{/* Page content */}
 				<div className="p-4 pb-20 md:pb-4">
-					<Outlet />
+					<div className="animate-fade-in">
+						<Outlet />
+					</div>
 				</div>
 			</main>
 
@@ -88,12 +97,12 @@ export function Layout() {
 							to={item.to}
 							className={({ isActive }) =>
 								cn(
-									'flex flex-col items-center py-2 px-4 text-xs',
+									'flex flex-col items-center py-2 px-4 text-xs transition-all duration-150 ease-out-expo active:scale-95',
 									isActive ? 'text-primary' : 'text-muted-foreground',
 								)
 							}
 						>
-							<span className="text-xl mb-1">{item.icon}</span>
+							<item.icon className="h-5 w-5 mb-1" />
 							{item.label}
 						</NavLink>
 					))}

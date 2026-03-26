@@ -4,58 +4,61 @@
 
 @layer base {
 	:root {
-		--background: 0 0% 100%;
-		--foreground: 0 0% 3.9%;
+		--background: 210 20% 98%;
+		--foreground: 220 20% 10%;
 		--card: 0 0% 100%;
-		--card-foreground: 0 0% 3.9%;
+		--card-foreground: 220 20% 10%;
 		--popover: 0 0% 100%;
-		--popover-foreground: 0 0% 3.9%;
-		--primary: 0 0% 9%;
-		--primary-foreground: 0 0% 98%;
-		--secondary: 0 0% 96.1%;
-		--secondary-foreground: 0 0% 9%;
-		--muted: 0 0% 96.1%;
-		--muted-foreground: 0 0% 45.1%;
-		--accent: 0 0% 96.1%;
-		--accent-foreground: 0 0% 9%;
-		--destructive: 0 84.2% 60.2%;
+		--popover-foreground: 220 20% 10%;
+		--primary: 217 91% 50%;
+		--primary-foreground: 0 0% 100%;
+		--secondary: 214 32% 91%;
+		--secondary-foreground: 220 20% 18%;
+		--muted: 214 32% 91%;
+		--muted-foreground: 220 9% 46%;
+		--accent: 214 32% 91%;
+		--accent-foreground: 220 20% 18%;
+		--destructive: 0 84% 60%;
 		--destructive-foreground: 0 0% 98%;
-		--border: 0 0% 89.8%;
-		--input: 0 0% 89.8%;
-		--ring: 0 0% 3.9%;
+		--border: 214 20% 88%;
+		--input: 214 20% 88%;
+		--ring: 217 91% 50%;
 		--radius: 0.5rem;
-		--chart-1: 12 76% 61%;
-		--chart-2: 173 58% 39%;
-		--chart-3: 197 37% 24%;
+		--chart-1: 217 91% 50%;
+		--chart-2: 199 89% 48%;
+		--chart-3: 173 58% 39%;
 		--chart-4: 43 74% 66%;
-		--chart-5: 27 87% 67%;
+		--chart-5: 262 60% 58%;
+		--ease-out-expo: cubic-bezier(0.23, 1, 0.32, 1);
+		--duration-fast: 150ms;
+		--duration-normal: 200ms;
 	}
 
 	.dark {
-		--background: 0 0% 3.9%;
-		--foreground: 0 0% 98%;
-		--card: 0 0% 3.9%;
-		--card-foreground: 0 0% 98%;
-		--popover: 0 0% 3.9%;
-		--popover-foreground: 0 0% 98%;
-		--primary: 0 0% 98%;
-		--primary-foreground: 0 0% 9%;
-		--secondary: 0 0% 14.9%;
-		--secondary-foreground: 0 0% 98%;
-		--muted: 0 0% 14.9%;
-		--muted-foreground: 0 0% 63.9%;
-		--accent: 0 0% 14.9%;
-		--accent-foreground: 0 0% 98%;
-		--destructive: 0 62.8% 30.6%;
+		--background: 220 20% 7%;
+		--foreground: 210 20% 98%;
+		--card: 220 18% 10%;
+		--card-foreground: 210 20% 98%;
+		--popover: 220 18% 10%;
+		--popover-foreground: 210 20% 98%;
+		--primary: 217 91% 55%;
+		--primary-foreground: 0 0% 100%;
+		--secondary: 217 20% 18%;
+		--secondary-foreground: 210 20% 98%;
+		--muted: 217 20% 18%;
+		--muted-foreground: 215 15% 55%;
+		--accent: 217 20% 18%;
+		--accent-foreground: 210 20% 98%;
+		--destructive: 0 63% 31%;
 		--destructive-foreground: 0 0% 98%;
-		--border: 0 0% 14.9%;
-		--input: 0 0% 14.9%;
-		--ring: 0 0% 83.1%;
-		--chart-1: 220 70% 50%;
-		--chart-2: 160 60% 45%;
-		--chart-3: 30 80% 55%;
-		--chart-4: 280 65% 60%;
-		--chart-5: 340 75% 55%;
+		--border: 217 15% 18%;
+		--input: 217 15% 18%;
+		--ring: 217 91% 55%;
+		--chart-1: 217 91% 55%;
+		--chart-2: 199 89% 48%;
+		--chart-3: 173 58% 45%;
+		--chart-4: 43 74% 66%;
+		--chart-5: 262 60% 62%;
 	}
 }
 
@@ -66,5 +69,31 @@
 	body {
 		@apply bg-background text-foreground;
 		font-family: Inter, system-ui, -apple-system, sans-serif;
+	}
+}
+
+@layer utilities {
+	.stagger-1 { animation-delay: 30ms; }
+	.stagger-2 { animation-delay: 60ms; }
+	.stagger-3 { animation-delay: 90ms; }
+	.stagger-4 { animation-delay: 120ms; }
+	.stagger-5 { animation-delay: 150ms; }
+	.stagger-6 { animation-delay: 180ms; }
+	.stagger-7 { animation-delay: 210ms; }
+}
+
+@layer utilities {
+	@media (hover: hover) and (pointer: fine) {
+		.hover-lift:hover {
+			transform: translateY(-1px);
+		}
+	}
+}
+
+@media (prefers-reduced-motion: reduce) {
+	*, *::before, *::after {
+		animation-duration: 0.01ms !important;
+		animation-iteration-count: 1 !important;
+		transition-duration: 0.01ms !important;
 	}
 }

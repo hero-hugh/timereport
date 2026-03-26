@@ -47,7 +47,7 @@ export function ApiSettingsPage() {
 	if (isLoading) {
 		return (
 			<div className="flex items-center justify-center h-64">
-				<p className="text-muted-foreground">Laddar...</p>
+				<p className="text-muted-foreground animate-pulse">Laddar...</p>
 			</div>
 		)
 	}
@@ -56,7 +56,7 @@ export function ApiSettingsPage() {
 		<div className="space-y-4">
 			<h1 className="text-2xl font-bold">API inställningar</h1>
 
-			<Card>
+			<Card className="animate-fade-in-up">
 				<CardHeader>
 					<CardTitle className="text-lg">BOX API token</CardTitle>
 				</CardHeader>
@@ -81,7 +81,7 @@ export function ApiSettingsPage() {
 
 						{message && (
 							<p
-								className={`text-sm ${message.type === 'success' ? 'text-green-600' : 'text-red-600'}`}
+								className={`text-sm animate-fade-in ${message.type === 'success' ? 'text-green-600' : 'text-red-600'}`}
 							>
 								{message.text}
 							</p>

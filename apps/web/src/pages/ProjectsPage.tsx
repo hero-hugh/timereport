@@ -1,3 +1,4 @@
+import { ArrowRight, ChevronRight, Plus } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { Button } from '../components/ui/button'
@@ -42,7 +43,7 @@ export function ProjectsPage() {
 	if (isLoading) {
 		return (
 			<div className="flex items-center justify-center h-64">
-				<p className="text-muted-foreground">Laddar...</p>
+				<p className="text-muted-foreground animate-pulse">Laddar...</p>
 			</div>
 		)
 	}
@@ -52,7 +53,10 @@ export function ProjectsPage() {
 			<div className="flex items-center justify-between">
 				<h1 className="text-2xl font-bold">Projekt</h1>
 				<Link to="/projects/new">
-					<Button>+ Nytt</Button>
+					<Button>
+						<Plus className="h-4 w-4 mr-1" />
+						Nytt
+					</Button>
 				</Link>
 			</div>
 
@@ -80,9 +84,9 @@ export function ProjectsPage() {
 			</div>
 
 			<div className="space-y-3">
-				{filteredProjects.map((project) => (
-					<Link key={project.id} to={`/projects/${project.id}`}>
-						<Card className="hover:bg-muted/50 transition-colors">
+				{filteredProjects.map((project, index) => (
+					<Link key={project.id} to={`/projects/${project.id}`} className={`block animate-fade-in-up stagger-${Math.min(index + 1, 7)}`}>
+						<Card className="hover:bg-muted/50 transition-all duration-150 ease-out-expo hover-lift">
 							<CardContent className="p-4">
 								<div className="flex items-start justify-between">
 									<div className="flex-1">
@@ -100,7 +104,7 @@ export function ProjectsPage() {
 												` • Slut: ${formatDate(project.endDate)}`}
 										</p>
 									</div>
-									<span className="text-muted-foreground">→</span>
+									<ChevronRight className="h-5 w-5 text-muted-foreground" />
 								</div>
 								<div className="mt-3 pt-3 border-t flex justify-between text-sm">
 									<span>{formatMinutes(project.totalMinutes)}</span>
@@ -128,7 +132,7 @@ export function ProjectsPage() {
 									to="/projects/new"
 									className="text-primary hover:underline mt-2 inline-block"
 								>
-									Skapa ditt första projekt →
+									Skapa ditt första projekt <ArrowRight className="inline h-4 w-4 ml-1" />
 								</Link>
 							)}
 						</CardContent>

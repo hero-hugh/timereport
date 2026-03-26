@@ -1,3 +1,4 @@
+import { ArrowLeft } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { Button } from '../components/ui/button'
@@ -89,7 +90,7 @@ export function ProjectFormPage() {
 	if (isLoading) {
 		return (
 			<div className="flex items-center justify-center h-64">
-				<p className="text-muted-foreground">Laddar...</p>
+				<p className="text-muted-foreground animate-pulse">Laddar...</p>
 			</div>
 		)
 	}
@@ -98,14 +99,15 @@ export function ProjectFormPage() {
 		<div className="max-w-lg mx-auto">
 			<div className="flex items-center gap-4 mb-6">
 				<Button variant="ghost" onClick={() => navigate(-1)}>
-					← Tillbaka
+					<ArrowLeft className="h-4 w-4 mr-1" />
+					Tillbaka
 				</Button>
 				<h1 className="text-xl font-bold">
 					{isEditing ? 'Redigera projekt' : 'Nytt projekt'}
 				</h1>
 			</div>
 
-			<Card>
+			<Card className="animate-scale-fade-in">
 				<CardContent className="pt-6">
 					<form onSubmit={handleSubmit} className="space-y-4">
 						<div className="space-y-2">

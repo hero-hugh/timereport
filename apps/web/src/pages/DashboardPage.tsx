@@ -1,3 +1,4 @@
+import { ArrowRight } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card'
@@ -37,7 +38,7 @@ export function DashboardPage() {
 	if (isLoading) {
 		return (
 			<div className="flex items-center justify-center h-64">
-				<p className="text-muted-foreground">Laddar...</p>
+				<p className="text-muted-foreground animate-pulse">Laddar...</p>
 			</div>
 		)
 	}
@@ -46,15 +47,15 @@ export function DashboardPage() {
 		<div className="space-y-6">
 			<div>
 				<h1 className="text-2xl font-bold">
-					Hej{user?.firstName ? `, ${user.firstName}` : ''}! 👋
+					Hej{user?.firstName ? `, ${user.firstName}` : ''}!
 				</h1>
 				<p className="text-muted-foreground">Här är en översikt av din tid</p>
 			</div>
 
 			{user && (!user.firstName || !user.lastName) && (
-				<Card className="border-blue-200 bg-blue-50">
+				<Card className="border-blue-200 dark:border-blue-800/40 bg-blue-50 dark:bg-blue-950/30">
 					<CardContent className="py-4">
-						<p className="text-sm text-blue-900">
+						<p className="text-sm text-blue-900 dark:text-blue-300">
 							Konfigurera din profil under{' '}
 							<Link to="/more" className="font-medium underline">
 								Mer
@@ -67,7 +68,7 @@ export function DashboardPage() {
 
 			{/* Stats cards */}
 			<div className="grid gap-4 md:grid-cols-3">
-				<Card>
+				<Card className="animate-fade-in-up">
 					<CardHeader className="pb-2">
 						<CardTitle className="text-sm font-medium text-muted-foreground">
 							Denna vecka
@@ -79,7 +80,7 @@ export function DashboardPage() {
 						</p>
 					</CardContent>
 				</Card>
-				<Card>
+				<Card className="animate-fade-in-up stagger-1">
 					<CardHeader className="pb-2">
 						<CardTitle className="text-sm font-medium text-muted-foreground">
 							Denna månad
@@ -96,7 +97,7 @@ export function DashboardPage() {
 						)}
 					</CardContent>
 				</Card>
-				<Card>
+				<Card className="animate-fade-in-up stagger-2">
 					<CardHeader className="pb-2">
 						<CardTitle className="text-sm font-medium text-muted-foreground">
 							Aktiva projekt
@@ -114,13 +115,13 @@ export function DashboardPage() {
 			<div className="flex gap-2">
 				<Link
 					to="/time"
-					className="flex-1 bg-primary text-primary-foreground rounded-md py-3 text-center font-medium hover:bg-primary/90 transition-colors"
+					className="flex-1 bg-primary text-primary-foreground rounded-md py-3 text-center font-medium hover:bg-primary/90 transition-all duration-150 ease-out-expo active:scale-[0.97]"
 				>
 					Rapportera tid
 				</Link>
 				<Link
 					to="/projects"
-					className="flex-1 bg-secondary text-secondary-foreground rounded-md py-3 text-center font-medium hover:bg-secondary/80 transition-colors"
+					className="flex-1 bg-secondary text-secondary-foreground rounded-md py-3 text-center font-medium hover:bg-secondary/80 transition-all duration-150 ease-out-expo active:scale-[0.97]"
 				>
 					Visa projekt
 				</Link>
@@ -161,7 +162,7 @@ export function DashboardPage() {
 							to="/time"
 							className="text-primary hover:underline mt-2 inline-block"
 						>
-							Börja rapportera tid →
+							Börja rapportera tid <ArrowRight className="inline h-4 w-4 ml-1" />
 						</Link>
 					</CardContent>
 				</Card>

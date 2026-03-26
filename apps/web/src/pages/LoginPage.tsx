@@ -1,3 +1,4 @@
+import { Clock } from 'lucide-react'
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Button } from '../components/ui/button'
@@ -82,9 +83,11 @@ export function LoginPage() {
 
 	return (
 		<div className="min-h-screen flex flex-col items-center justify-center p-4 bg-muted/50">
-			<Card className="w-full max-w-md">
+			<Card className="w-full max-w-md animate-scale-fade-in">
 				<CardHeader className="text-center">
-					<div className="mx-auto mb-4 text-4xl">⏱</div>
+					<div className="mx-auto mb-4">
+						<Clock className="h-10 w-10 mx-auto" />
+					</div>
 					<CardTitle className="text-2xl">Tidrapportering</CardTitle>
 					<CardDescription>
 						{step === 'email'
@@ -94,7 +97,7 @@ export function LoginPage() {
 				</CardHeader>
 				<CardContent>
 					{step === 'email' ? (
-						<form onSubmit={handleRequestOtp} className="space-y-4">
+						<form onSubmit={handleRequestOtp} className="space-y-4 animate-fade-in">
 							<div className="space-y-2">
 								<Label htmlFor="email">E-post</Label>
 								<Input
@@ -114,7 +117,7 @@ export function LoginPage() {
 							</Button>
 						</form>
 					) : (
-						<form onSubmit={handleVerifyOtp} className="space-y-6">
+						<form onSubmit={handleVerifyOtp} className="space-y-6 animate-fade-in">
 							<div className="space-y-4">
 								<Label>6-siffrig kod</Label>
 								<div className="flex justify-center">
@@ -162,7 +165,7 @@ export function LoginPage() {
 					)}
 				</CardContent>
 			</Card>
-			<footer className="mt-8 w-full max-w-md text-center text-sm text-muted-foreground space-y-1">
+			<footer className="mt-8 w-full max-w-md text-center text-sm text-muted-foreground space-y-1 animate-fade-in stagger-2">
 				<p>
 					Tidrapportering - Ett verktyg för enkel och effektiv tidsredovisning.
 				</p>

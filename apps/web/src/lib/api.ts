@@ -39,6 +39,9 @@ class ApiClient {
 					const retryResponse = await fetch(url, config)
 					return retryResponse.json()
 				}
+				// Refresh misslyckades — sessionen är död
+				window.dispatchEvent(new Event('auth:session-expired'))
+				return { success: false, error: 'Sessionen har gått ut' }
 			}
 
 			return response.json()
@@ -309,7 +312,8 @@ class ApiClient {
 				}
 				return { success: true as const, blob: await retryResponse.blob() }
 			}
-			return { success: false as const, error: 'Ej inloggad' }
+			window.dispatchEvent(new Event('auth:session-expired'))
+			return { success: false as const, error: 'Sessionen har gått ut' }
 		}
 
 		if (!response.ok) {

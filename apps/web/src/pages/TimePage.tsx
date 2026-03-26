@@ -1,3 +1,4 @@
+import { ChevronLeft, ChevronRight } from 'lucide-react'
 import { useCallback, useEffect, useState } from 'react'
 import { useBlocker } from 'react-router-dom'
 import { UnsavedChangesBar } from '../components/UnsavedChangesBar'
@@ -263,7 +264,7 @@ export function TimePage() {
 	if (isLoading) {
 		return (
 			<div className="flex items-center justify-center h-64">
-				<p className="text-muted-foreground">Laddar...</p>
+				<p className="text-muted-foreground animate-pulse">Laddar...</p>
 			</div>
 		)
 	}
@@ -273,9 +274,9 @@ export function TimePage() {
 			{/* Week navigation */}
 			<div className="flex items-center justify-between">
 				<Button variant="outline" size="icon" onClick={handlePrevWeek}>
-					◀
+					<ChevronLeft className="h-4 w-4" />
 				</Button>
-				<div className="text-center">
+				<div className="text-center animate-fade-in" key={`${weekNumber}-${weekStart.getFullYear()}`}>
 					<p className="font-semibold">
 						Vecka {weekNumber}, {weekStart.getFullYear()}
 					</p>
@@ -284,7 +285,7 @@ export function TimePage() {
 					</p>
 				</div>
 				<Button variant="outline" size="icon" onClick={handleNextWeek}>
-					▶
+					<ChevronRight className="h-4 w-4" />
 				</Button>
 			</div>
 
@@ -365,7 +366,7 @@ export function TimePage() {
 												onBlur={handleTimeBlur}
 												className={cn(
 													'text-center h-12 text-lg',
-													redDay && 'bg-red-50 border-red-200',
+													redDay && 'bg-red-50 dark:bg-red-950/30 border-red-200 dark:border-red-800/40',
 												)}
 											/>
 										</div>
@@ -393,7 +394,7 @@ export function TimePage() {
 												key={day.toISOString()}
 												className={cn(
 													'text-center p-3 min-w-[80px]',
-													redDay && 'bg-red-50',
+													redDay && 'bg-red-50 dark:bg-red-950/30',
 												)}
 												title={holidayName}
 											>
@@ -435,7 +436,7 @@ export function TimePage() {
 											return (
 												<td
 													key={dateKey}
-													className={cn('p-2', redDay && 'bg-red-50')}
+													className={cn('p-2', redDay && 'bg-red-50 dark:bg-red-950/30')}
 												>
 													<Input
 														type="text"
@@ -452,7 +453,7 @@ export function TimePage() {
 														onBlur={handleTimeBlur}
 														className={cn(
 															'text-center w-full',
-															redDay && 'border-red-200',
+															redDay && 'border-red-200 dark:border-red-800/40',
 														)}
 													/>
 												</td>
@@ -473,7 +474,7 @@ export function TimePage() {
 												key={dateKey}
 												className={cn(
 													'p-3 text-center',
-													redDay && 'bg-red-100/50',
+													redDay && 'bg-red-100/50 dark:bg-red-950/40',
 												)}
 											>
 												{formatMinutes(getDayTotal(dateKey), 'time')}
