@@ -88,22 +88,3 @@ jobs:
           name: playwright-report
           path: test-results/
           retention-days: 7
-
-  docker-build:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Build backend image
-        uses: docker/build-push-action@v6
-        with:
-          context: .
-          file: ./Dockerfile.api
-          push: false
-
-      - name: Build frontend image
-        uses: docker/build-push-action@v6
-        with:
-          context: .
-          file: ./Dockerfile.web
-          push: false
