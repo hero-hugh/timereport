@@ -49,6 +49,17 @@ jobs:
         run: npm run db:generate:all
         working-directory: apps/api
 
+      - name: Create API env file
+        run: |
+          printf '%s\n' \
+            'AUTH_DATABASE_URL="file:./data/auth.db"' \
+            'USER_DATABASE_URL="file:./data/placeholder.db"' \
+            'DATABASE_DIR="./data"' \
+            'JWT_SECRET="ci-test-secret-must-be-at-least-32-characters"' \
+            'JWT_REFRESH_SECRET="ci-test-refresh-secret-must-be-32-chars"' \
+            'FRONTEND_URL="http://localhost:5173"' \
+            > apps/api/.env.local
+
       - name: Set up databases
         run: |
           npm run db:push:auth
