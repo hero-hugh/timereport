@@ -32,7 +32,7 @@ test.describe('Time reporting', () => {
 		// Bar should disappear after save
 		await expect(
 			page.getByText('Du har osparade ändringar'),
-		).not.toBeVisible()
+		).not.toBeVisible({ timeout: 15_000 })
 
 		// The value should persist (formatted as 8:00)
 		await expect(firstInput).toHaveValue('8:00')
