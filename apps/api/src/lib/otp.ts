@@ -9,6 +9,9 @@ const MAX_ATTEMPTS = 5
  * Generera en 6-siffrig OTP-kod
  */
 export function generateOtpCode(): string {
+	if (process.env.E2E_TEST_OTP) {
+		return process.env.E2E_TEST_OTP
+	}
 	const min = 10 ** (OTP_LENGTH - 1)
 	const max = 10 ** OTP_LENGTH - 1
 	return randomInt(min, max + 1).toString()

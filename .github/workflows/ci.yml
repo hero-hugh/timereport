@@ -3,8 +3,6 @@ name: CI
 on:
   pull_request:
     branches: [master]
-  push:
-    branches-ignore: [master]
 
 jobs:
   test:
@@ -31,21 +29,62 @@ jobs:
       - name: Run tests
         run: npm test
 
-  docker-build:
+  e2e:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
 
-      - name: Build backend image
-        uses: docker/build-push-action@v6
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
         with:
-          context: .
-          file: ./Dockerfile.api
-          push: false
+          node-version: 20
+          cache: npm
 
-      - name: Build frontend image
-        uses: docker/build-push-action@v6
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Generate Prisma clients
+        run: npm run db:generate:all
+        working-directory: apps/api
+
+      - name: Create API env file
+        run: |
+          printf '%s\n' \
+            'AUTH_DATABASE_URL="file:./data/auth.db"' \
+            'USER_DATABASE_URL="file:./data/placeholder.db"' \
+            'DATABASE_DIR="./data"' \
+            'JWT_SECRET="ci-test-secret-must-be-at-least-32-characters"' \
+            'JWT_REFRESH_SECRET="ci-test-refresh-secret-must-be-32-chars"' \
+            'FRONTEND_URL="http://localhost:5173"' \
+            > apps/api/.env.local
+
+      - name: Set up databases
+        run: |
+          npm run db:push:auth
+          npm run db:push:user
+        working-directory: apps/api
+        env:
+          AUTH_DATABASE_URL: "file:./data/auth.db"
+          USER_DATABASE_URL: "file:./data/placeholder.db"
+
+      - name: Install Playwright browsers
+        run: npx playwright install chromium --with-deps
+
+      - name: Run E2E tests
+        run: npm run test:e2e
+        env:
+          E2E_TEST_OTP: "000000"
+          AUTH_DATABASE_URL: "file:./data/auth.db"
+          USER_DATABASE_URL: "file:./data/placeholder.db"
+          DATABASE_DIR: "./data"
+          JWT_SECRET: "ci-test-secret-must-be-at-least-32-characters"
+          JWT_REFRESH_SECRET: "ci-test-refresh-secret-must-be-32-chars"
+          FRONTEND_URL: "http://localhost:5173"
+
+      - name: Upload test results
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@v4
         with:
-          context: .
-          file: ./Dockerfile.web
-          push: false
+          name: playwright-report
+          path: test-results/
+          retention-days: 7

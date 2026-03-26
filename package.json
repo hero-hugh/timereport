@@ -1,7 +1,10 @@
 {
 	"name": "time-report",
 	"private": true,
-	"workspaces": ["apps/*", "packages/*"],
+	"workspaces": [
+		"apps/*",
+		"packages/*"
+	],
 	"scripts": {
 		"dev": "turbo dev",
 		"build": "turbo build",
@@ -13,10 +16,15 @@
 		"db:push": "npm run db:push --workspace=@time-report/api",
 		"db:studio": "npm run db:studio --workspace=@time-report/api",
 		"test": "turbo test",
-		"test:api": "npm run test --workspace=@time-report/api"
+		"test:api": "npm run test --workspace=@time-report/api",
+		"test:e2e": "npx playwright test",
+		"test:e2e:ui": "npx playwright test --ui"
 	},
 	"devDependencies": {
 		"@biomejs/biome": "^1.5.0",
+		"@playwright/test": "^1.58.2",
+		"@types/better-sqlite3": "^7.6.13",
+		"better-sqlite3": "^12.8.0",
 		"turbo": "^2.0.0",
 		"typescript": "^5.3.0"
 	},
