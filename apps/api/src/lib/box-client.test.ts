@@ -183,10 +183,7 @@ describe('updateTimeReport', () => {
 				comment: 'Updated',
 			},
 		]
-		const result = await updateTimeReport('token', 'r1', entries, {
-			firstName: 'Jane',
-			lastName: 'Doe',
-		})
+		const result = await updateTimeReport('token', 'r1', entries)
 		expect(result).toEqual(updatedReport)
 
 		const body = JSON.parse(fetchMock.mock.calls[0][1].body)
@@ -194,9 +191,6 @@ describe('updateTimeReport', () => {
 			id: 'r1',
 			input: {
 				timeReportEntries: entries,
-				firstName: 'Jane',
-				lastName: 'Doe',
-				supplierInvoiceNumber: null,
 			},
 		})
 	})

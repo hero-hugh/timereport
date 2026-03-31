@@ -203,10 +203,7 @@ boxSync.post('/sync', async (c) => {
 
 	// 7. Update the BOX report
 	try {
-		await updateTimeReport(token, boxReport.id, updatedEntries, {
-			firstName: dbUser.firstName,
-			lastName: dbUser.lastName,
-		})
+		await updateTimeReport(token, boxReport.id, updatedEntries)
 	} catch (error) {
 		if (error instanceof BoxApiError) {
 			console.error('BOX API error updating time report:', error.message)
