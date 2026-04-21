@@ -10,7 +10,11 @@ import {
 	updateTimeReport,
 } from '../lib/box-client'
 import { minutesToHHMM } from '../lib/box-mapper'
-import { decryptSecret } from '../lib/crypto'
+import {
+	decryptSecret,
+	encryptSecret,
+	isEncryptedSecret,
+} from '../lib/crypto'
 import { getAuthUser, getAuthUserDb, requireAuth } from '../middleware/auth'
 
 function mapBoxErrorToUserMessage(error: BoxApiError): string {
@@ -86,18 +90,33 @@ boxSync.post('/sync', async (c) => {
 	}
 
 	let token: string
-	try {
-		token = decryptSecret(dbUser.boxApiToken)
-	} catch (err) {
-		console.error('[BOX-SYNC] Failed to decrypt token', err)
-		return c.json(
-			{
-				success: false,
-				error:
-					'BOX API token kunde inte läsas — konfigurera en ny token i API-inställningar',
-			},
-			400,
-		)
+	if (isEncryptedSecret(dbUser.boxApiToken)) {
+		try {
+			token = decryptSecret(dbUser.boxApiToken)
+		} catch (err) {
+			console.error('[BOX-SYNC] Failed to decrypt token', err)
+			return c.json(
+				{
+					success: false,
+					error:
+						'BOX API token kunde inte läsas — konfigurera en ny token i API-inställningar',
+				},
+				400,
+			)
+		}
+	} else {
+		// Legacy plaintext token from before encryption was added — use it now
+		// and migrate to the encrypted form so subsequent reads are normal.
+		token = dbUser.boxApiToken
+		try {
+			await authDb.user.update({
+				where: { id: userId },
+				data: { boxApiToken: encryptSecret(token) },
+			})
+		} catch (err) {
+			// Don't fail the sync; migration can retry on next call.
+			console.error('[BOX-SYNC] Failed to migrate legacy token', err)
+		}
 	}
 
 	// 2. Fetch local time entries for the month

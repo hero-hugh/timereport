@@ -10,6 +10,14 @@ const IV_LENGTH = 12
 const AUTH_TAG_LENGTH = 16
 const VERSION = 'v1'
 
+/**
+ * Returns true if the value appears to already be encrypted (has our version prefix).
+ * Used during the plaintext→encrypted migration of legacy values.
+ */
+export function isEncryptedSecret(value: string): boolean {
+	return value.startsWith(`${VERSION}:`)
+}
+
 function getKey(): Buffer {
 	const raw = process.env.TOKEN_ENCRYPTION_KEY
 	if (!raw) {
