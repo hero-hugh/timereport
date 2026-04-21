@@ -54,7 +54,7 @@ describe('AuthService', () => {
 			const result = await authService.verifyOtp('test@example.com', '123456')
 
 			expect(result.success).toBe(false)
-			expect(result.error).toBe('Ingen aktiv kod hittades')
+			expect(result.error).toBe('Ogiltig eller utgången kod')
 		})
 
 		it('should return error for wrong code', async () => {
@@ -71,7 +71,7 @@ describe('AuthService', () => {
 			const result = await authService.verifyOtp('test@example.com', '654321')
 
 			expect(result.success).toBe(false)
-			expect(result.error).toBe('Felaktig kod')
+			expect(result.error).toBe('Ogiltig eller utgången kod')
 		})
 
 		it('should increment attempts on wrong code', async () => {
@@ -224,7 +224,7 @@ describe('AuthService', () => {
 			const result = await authService.verifyOtp('test@example.com', '123456')
 
 			expect(result.success).toBe(false)
-			expect(result.error).toBe('Koden har gått ut')
+			expect(result.error).toBe('Ogiltig eller utgången kod')
 		})
 	})
 

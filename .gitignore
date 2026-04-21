@@ -33,6 +33,7 @@ npm-debug.log*
 
 # Testing
 coverage/
+test-results/
 
 # Ralph
 

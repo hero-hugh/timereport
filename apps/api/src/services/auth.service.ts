@@ -76,10 +76,6 @@ export class AuthService {
 	}> {
 		const normalizedEmail = email.toLowerCase().trim()
 
-		console.log(
-			`[AUTH] Verifying OTP for: "${normalizedEmail}" with code: "${code}"`,
-		)
-
 		// Hitta senaste oanvända koden för denna e-post
 		const otpRecord = await authDb.otpCode.findFirst({
 			where: {
@@ -91,20 +87,8 @@ export class AuthService {
 			},
 		})
 
-		console.log(
-			'[AUTH] Found OTP record:',
-			otpRecord
-				? {
-						id: otpRecord.id,
-						email: otpRecord.email,
-						used: otpRecord.used,
-						attempts: otpRecord.attempts,
-					}
-				: 'none',
-		)
-
 		if (!otpRecord) {
-			return { success: false, error: 'Ingen aktiv kod hittades' }
+			return { success: false, error: 'Ogiltig eller utgången kod' }
 		}
 
 		// Kolla om utgången
@@ -113,7 +97,7 @@ export class AuthService {
 				where: { id: otpRecord.id },
 				data: { used: true },
 			})
-			return { success: false, error: 'Koden har gått ut' }
+			return { success: false, error: 'Ogiltig eller utgången kod' }
 		}
 
 		// Kolla max försök
@@ -122,21 +106,18 @@ export class AuthService {
 				where: { id: otpRecord.id },
 				data: { used: true },
 			})
-			return { success: false, error: 'För många försök, begär en ny kod' }
+			return { success: false, error: 'Ogiltig eller utgången kod' }
 		}
 
 		// Verifiera koden
 		const codeMatches = verifyOtpCode(code, otpRecord.codeHash)
-		console.log(
-			`[AUTH] Code verification: ${codeMatches ? 'MATCH' : 'NO MATCH'}`,
-		)
 
 		if (!codeMatches) {
 			await authDb.otpCode.update({
 				where: { id: otpRecord.id },
 				data: { attempts: otpRecord.attempts + 1 },
 			})
-			return { success: false, error: 'Felaktig kod' }
+			return { success: false, error: 'Ogiltig eller utgången kod' }
 		}
 
 		// Markera koden som använd

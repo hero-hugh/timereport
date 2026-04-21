@@ -10,6 +10,7 @@ import {
 	updateTimeReport,
 } from '../lib/box-client'
 import { minutesToHHMM } from '../lib/box-mapper'
+import { decryptSecret } from '../lib/crypto'
 import { getAuthUser, getAuthUserDb, requireAuth } from '../middleware/auth'
 
 function mapBoxErrorToUserMessage(error: BoxApiError): string {
@@ -84,7 +85,20 @@ boxSync.post('/sync', async (c) => {
 		)
 	}
 
-	const token = dbUser.boxApiToken
+	let token: string
+	try {
+		token = decryptSecret(dbUser.boxApiToken)
+	} catch (err) {
+		console.error('[BOX-SYNC] Failed to decrypt token', err)
+		return c.json(
+			{
+				success: false,
+				error:
+					'BOX API token kunde inte läsas — konfigurera en ny token i API-inställningar',
+			},
+			400,
+		)
+	}
 
 	// 2. Fetch local time entries for the month
 	const monthStart = new Date(Date.UTC(year, month - 1, 1))

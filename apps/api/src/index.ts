@@ -11,13 +11,49 @@ import reports from './routes/reports'
 import timeEntries from './routes/time-entries'
 import user from './routes/user'
 
+// Startup-säkerhetsassertions — misconfig ska inte gå att missa i prod.
+if (process.env.NODE_ENV === 'production') {
+	if (process.env.E2E_TEST_OTP) {
+		throw new Error(
+			'E2E_TEST_OTP must not be set in production — would allow any user to log in with a fixed code.',
+		)
+	}
+	if (!process.env.FRONTEND_URL) {
+		throw new Error('FRONTEND_URL must be set in production.')
+	}
+	if (!process.env.FRONTEND_URL.startsWith('https://')) {
+		throw new Error('FRONTEND_URL must use https:// in production.')
+	}
+	if (process.env.JWT_SECRET === process.env.JWT_REFRESH_SECRET) {
+		throw new Error('JWT_SECRET and JWT_REFRESH_SECRET must be different.')
+	}
+	if (!process.env.TOKEN_ENCRYPTION_KEY) {
+		throw new Error(
+			'TOKEN_ENCRYPTION_KEY must be set in production (base64 of 32 random bytes).',
+		)
+	}
+	const keyBytes = Buffer.from(
+		process.env.TOKEN_ENCRYPTION_KEY,
+		'base64',
+	).length
+	if (keyBytes !== 32) {
+		throw new Error(
+			`TOKEN_ENCRYPTION_KEY must decode to 32 bytes (got ${keyBytes}).`,
+		)
+	}
+}
+
 const app = new Hono()
+
+const ALLOWED_ORIGIN =
+	process.env.FRONTEND_URL ||
+	(process.env.NODE_ENV === 'production' ? '' : 'http://localhost:5173')
 
 // Middleware
 app.use(
 	'*',
 	cors({
-		origin: process.env.FRONTEND_URL || 'http://localhost:5173',
+		origin: ALLOWED_ORIGIN,
 		credentials: true,
 	}),
 )
@@ -45,13 +81,11 @@ app.notFound((c) => {
 // Error handler
 app.onError((err, c) => {
 	console.error('Server error:', err)
+	const exposeDetails = process.env.NODE_ENV !== 'production'
 	return c.json(
 		{
 			success: false,
-			error:
-				process.env.NODE_ENV === 'development'
-					? err.message
-					: 'Internal server error',
+			error: exposeDetails ? err.message : 'Internal server error',
 		},
 		500,
 	)

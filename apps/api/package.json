@@ -25,6 +25,7 @@
 		"@prisma/client": "^5.9.0",
 		"@time-report/shared": "*",
 		"hono": "^4.0.0",
+		"hono-rate-limiter": "^0.5.3",
 		"jose": "^5.2.0",
 		"pdfkit": "^0.17.2",
 		"resend": "^6.9.2"

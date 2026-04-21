@@ -6,6 +6,7 @@ import {
 	type BoxTimeReport,
 	type TimeReportNode,
 } from '../lib/box-client'
+import { encryptSecret } from '../lib/crypto'
 import { testUserDb } from '../test/test-user-db'
 
 vi.mock('../lib/jwt', () => ({
@@ -54,7 +55,7 @@ async function createTestUserWithToken(
 		data: {
 			id,
 			email: `${id}@example.com`,
-			boxApiToken: token,
+			boxApiToken: token ? encryptSecret(token) : null,
 			firstName: 'Test',
 			lastName: 'User',
 		},
@@ -159,7 +160,7 @@ describe('POST /api/box/sync', () => {
 			data: {
 				id: 'no-profile-user',
 				email: 'no-profile@example.com',
-				boxApiToken: 'box-api-token-123',
+				boxApiToken: encryptSecret('box-api-token-123'),
 			},
 		})
 		await authenticateRequest('no-profile-user')

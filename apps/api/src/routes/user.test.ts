@@ -1,6 +1,7 @@
 import { Hono } from 'hono'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { authDb } from '../lib/auth-db'
+import { decryptSecret, encryptSecret } from '../lib/crypto'
 
 vi.mock('../lib/jwt', () => ({
 	verifyAccessToken: vi.fn(),
@@ -72,7 +73,7 @@ describe('User routes - BOX token', () => {
 				data: {
 					id: 'user-with-token',
 					email: 'with-token@example.com',
-					boxApiToken: 'some-secret-token',
+					boxApiToken: encryptSecret('some-secret-token-value'),
 				},
 			})
 			await authenticateRequest('user-with-token')
@@ -95,7 +96,7 @@ describe('User routes - BOX token', () => {
 				data: {
 					id: 'user-secret',
 					email: 'secret@example.com',
-					boxApiToken: 'super-secret-token',
+					boxApiToken: encryptSecret('super-secret-token'),
 				},
 			})
 			await authenticateRequest('user-secret')
@@ -154,9 +155,9 @@ describe('User routes - BOX token', () => {
 			expect(body.success).toBe(false)
 		})
 
-		it('saves token successfully', async () => {
-			await createTestUser('save-user')
-			await authenticateRequest('save-user')
+		it('returns 400 when token is too short', async () => {
+			await createTestUser()
+			await authenticateRequest()
 
 			const res = await app.request('/api/user/box-token', {
 				method: 'PUT',
@@ -164,7 +165,23 @@ describe('User routes - BOX token', () => {
 					Authorization: 'Bearer valid-token',
 					'Content-Type': 'application/json',
 				},
-				body: JSON.stringify({ token: 'my-box-api-token' }),
+				body: JSON.stringify({ token: 'too-short' }),
+			})
+			expect(res.status).toBe(400)
+		})
+
+		it('saves token successfully and encrypts it at rest', async () => {
+			await createTestUser('save-user')
+			await authenticateRequest('save-user')
+
+			const plaintext = 'my-box-api-token-that-is-long-enough'
+			const res = await app.request('/api/user/box-token', {
+				method: 'PUT',
+				headers: {
+					Authorization: 'Bearer valid-token',
+					'Content-Type': 'application/json',
+				},
+				body: JSON.stringify({ token: plaintext }),
 			})
 			expect(res.status).toBe(200)
 
@@ -174,11 +191,14 @@ describe('User routes - BOX token', () => {
 			}
 			expect(body.success).toBe(true)
 
-			// Verify token was persisted
+			// Verify token was persisted AND encrypted (not plaintext)
 			const dbUser = await authDb.user.findUnique({
 				where: { id: 'save-user' },
 			})
-			expect(dbUser?.boxApiToken).toBe('my-box-api-token')
+			expect(dbUser?.boxApiToken).toBeDefined()
+			expect(dbUser?.boxApiToken).not.toBe(plaintext)
+			expect(dbUser?.boxApiToken?.startsWith('v1:')).toBe(true)
+			expect(decryptSecret(dbUser?.boxApiToken as string)).toBe(plaintext)
 		})
 
 		it('overwrites existing token', async () => {
@@ -186,25 +206,26 @@ describe('User routes - BOX token', () => {
 				data: {
 					id: 'overwrite-user',
 					email: 'overwrite@example.com',
-					boxApiToken: 'old-token',
+					boxApiToken: encryptSecret('old-token-value-long'),
 				},
 			})
 			await authenticateRequest('overwrite-user')
 
+			const newToken = 'new-token-value-that-is-long-enough'
 			const res = await app.request('/api/user/box-token', {
 				method: 'PUT',
 				headers: {
 					Authorization: 'Bearer valid-token',
 					'Content-Type': 'application/json',
 				},
-				body: JSON.stringify({ token: 'new-token' }),
+				body: JSON.stringify({ token: newToken }),
 			})
 			expect(res.status).toBe(200)
 
 			const dbUser = await authDb.user.findUnique({
 				where: { id: 'overwrite-user' },
 			})
-			expect(dbUser?.boxApiToken).toBe('new-token')
+			expect(decryptSecret(dbUser?.boxApiToken as string)).toBe(newToken)
 		})
 	})
 })

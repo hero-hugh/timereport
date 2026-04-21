@@ -232,8 +232,15 @@ export class PdfService {
 
 	private drawTotal(doc: PDFKit.PDFDocument, totalMinutes: number) {
 		doc.y += 6
-		const totalY = doc.y
 		const totalHeight = 28
+
+		// Ensure total row fits on current page
+		if (doc.y + totalHeight > 750) {
+			doc.addPage()
+			doc.y = PAGE_MARGIN
+		}
+
+		const totalY = doc.y
 
 		doc
 			.rect(TABLE_LEFT, totalY, TABLE_WIDTH, totalHeight)
@@ -250,10 +257,10 @@ export class PdfService {
 	}
 
 	private drawFooter(doc: PDFKit.PDFDocument, generatedAt: string) {
-		const pageBottom = 800
+		const footerY = doc.y + 20
 		doc
-			.moveTo(PAGE_MARGIN, pageBottom)
-			.lineTo(PAGE_MARGIN + TABLE_WIDTH, pageBottom)
+			.moveTo(PAGE_MARGIN, footerY)
+			.lineTo(PAGE_MARGIN + TABLE_WIDTH, footerY)
 			.strokeColor(BORDER_COLOR)
 			.lineWidth(0.5)
 			.stroke()
@@ -265,7 +272,7 @@ export class PdfService {
 			.text(
 				`Tidrapport genererad ${generatedAt}`,
 				PAGE_MARGIN,
-				pageBottom + 6,
+				footerY + 6,
 				{ align: 'center', width: TABLE_WIDTH },
 			)
 	}

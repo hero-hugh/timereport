@@ -1,4 +1,4 @@
-import { createHash, randomInt } from 'node:crypto'
+import { createHash, randomInt, timingSafeEqual } from 'node:crypto'
 import { sendLoginCodeEmail } from './email'
 
 const OTP_LENGTH = 6
@@ -9,7 +9,10 @@ const MAX_ATTEMPTS = 5
  * Generera en 6-siffrig OTP-kod
  */
 export function generateOtpCode(): string {
-	if (process.env.E2E_TEST_OTP) {
+	if (
+		process.env.NODE_ENV !== 'production' &&
+		process.env.E2E_TEST_OTP
+	) {
 		return process.env.E2E_TEST_OTP
 	}
 	const min = 10 ** (OTP_LENGTH - 1)
@@ -25,10 +28,13 @@ export function hashOtpCode(code: string): string {
 }
 
 /**
- * Verifiera att en kod matchar hashen
+ * Verifiera att en kod matchar hashen (timing-safe)
  */
 export function verifyOtpCode(code: string, hash: string): boolean {
-	return hashOtpCode(code) === hash
+	const candidate = Buffer.from(hashOtpCode(code), 'hex')
+	const stored = Buffer.from(hash, 'hex')
+	if (candidate.length !== stored.length) return false
+	return timingSafeEqual(candidate, stored)
 }
 
 /**

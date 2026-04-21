@@ -54,13 +54,18 @@ COPY --from=builder /app/packages/shared/dist/ ./packages/shared/dist/
 # Point shared package exports to compiled JS instead of TS source
 RUN sed -i 's|./src/index.ts|./dist/index.js|g' packages/shared/package.json
 
-# Create database directory for per-user SQLite files
-RUN mkdir -p /app/data
+# Create a non-root user and database directory with proper ownership
+RUN addgroup -S app -g 1001 && adduser -S app -G app -u 1001 \
+    && mkdir -p /app/data \
+    && chown -R app:app /app
 
 # Mark data directory as a volume for persistence
 VOLUME ["/app/data"]
 
+USER app
+
 EXPOSE 3000
 
-# Push auth schema at startup, then start the server
-CMD ["sh", "-c", "npx prisma db push --schema=apps/api/prisma/central/schema.prisma --skip-generate && node apps/api/dist/index.js"]
+# Push auth schema at startup, then start the server.
+# set -e ensures we don't silently start the server if the migration fails.
+CMD ["sh", "-c", "set -e && npx prisma db push --schema=apps/api/prisma/central/schema.prisma --skip-generate && exec node apps/api/dist/index.js"]

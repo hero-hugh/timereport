@@ -1,6 +1,7 @@
 import { Hono } from 'hono'
 import { z } from 'zod'
 import { authDb } from '../lib/auth-db'
+import { encryptSecret } from '../lib/crypto'
 import { getAuthUser, requireAuth } from '../middleware/auth'
 
 const user = new Hono()
@@ -27,7 +28,14 @@ const updateProfileSchema = z.object({
 })
 
 const saveBoxTokenSchema = z.object({
-	token: z.string().min(1, 'Token får inte vara tom'),
+	token: z
+		.string()
+		.min(20, 'Token är för kort')
+		.max(4096, 'Token är för lång')
+		.regex(
+			/^[A-Za-z0-9._~+/=-]+$/,
+			'Token innehåller otillåtna tecken',
+		),
 })
 
 /**
@@ -105,7 +113,7 @@ user.put('/box-token', async (c) => {
 
 	await authDb.user.update({
 		where: { id: userId },
-		data: { boxApiToken: parsed.data.token },
+		data: { boxApiToken: encryptSecret(parsed.data.token) },
 	})
 
 	return c.json({ success: true, data: { message: 'Token sparad' } })

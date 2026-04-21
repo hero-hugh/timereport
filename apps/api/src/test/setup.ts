@@ -15,6 +15,10 @@ process.env.USER_DATABASE_URL = `file:${testUserDbPath}`
 process.env.DATABASE_DIR = process.env.DATABASE_DIR || './test-data'
 process.env.JWT_SECRET = 'test-secret-that-is-at-least-32-characters-long'
 process.env.JWT_REFRESH_SECRET = 'test-refresh-secret-at-least-32-characters'
+// 32-byte base64 nyckel för AES-256-GCM testning (testvärde, rotera för prod)
+process.env.TOKEN_ENCRYPTION_KEY =
+	process.env.TOKEN_ENCRYPTION_KEY ||
+	'dHR0dHR0dHR0dHR0dHR0dHR0dHR0dHR0dHR0dHR0dHQ='
 process.env.NODE_ENV = 'test'
 
 // Importera DB clients efter att env-variabler satts

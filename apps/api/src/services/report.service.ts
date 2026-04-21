@@ -124,8 +124,6 @@ export class ReportService {
 		})
 
 		// Group entries by date (YYYY-MM-DD)
-		const dailyHours: { date: string; minutes: number; projects: string[] }[] =
-			[]
 		const dayMap = new Map<string, { minutes: number; projects: Set<string> }>()
 
 		for (const entry of entries) {
@@ -142,15 +140,20 @@ export class ReportService {
 			}
 		}
 
-		for (const [date, data] of dayMap) {
+		// Include all days of the month, even those without entries
+		const daysInMonth = new Date(Date.UTC(year, month, 0)).getUTCDate()
+		const dailyHours: { date: string; minutes: number; projects: string[] }[] =
+			[]
+
+		for (let day = 1; day <= daysInMonth; day++) {
+			const dateStr = `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`
+			const data = dayMap.get(dateStr)
 			dailyHours.push({
-				date,
-				minutes: data.minutes,
-				projects: Array.from(data.projects),
+				date: dateStr,
+				minutes: data?.minutes ?? 0,
+				projects: data ? Array.from(data.projects) : [],
 			})
 		}
-
-		dailyHours.sort((a, b) => a.date.localeCompare(b.date))
 
 		const totalMinutes = entries.reduce((sum, entry) => sum + entry.minutes, 0)
 

@@ -145,21 +145,34 @@ describe('GET /api/reports/pdf', () => {
 			// Required: date of report generation
 			expect(reportData.generatedAt).toMatch(/^\d{4}-\d{2}-\d{2}$/)
 			// Required: reported hours per day
-			expect(reportData.dailyHours).toHaveLength(2)
-			expect(reportData.dailyHours).toEqual(
-				expect.arrayContaining([
-					expect.objectContaining({
-						date: '2024-03-11',
-						minutes: 480,
-						projects: ['Alfa Projektet'],
-					}),
-					expect.objectContaining({
-						date: '2024-03-12',
-						minutes: 240,
-						projects: ['Alfa Projektet'],
-					}),
-				]),
-			)
+			expect(reportData.dailyHours).toHaveLength(31)
+			// Days with reported time have correct values
+			expect(reportData.dailyHours[10]).toEqual({
+				date: '2024-03-11',
+				minutes: 480,
+				projects: ['Alfa Projektet'],
+			})
+			expect(reportData.dailyHours[11]).toEqual({
+				date: '2024-03-12',
+				minutes: 240,
+				projects: ['Alfa Projektet'],
+			})
+			// Days without reported time show 0
+			expect(reportData.dailyHours[0]).toEqual({
+				date: '2024-03-01',
+				minutes: 0,
+				projects: [],
+			})
+			expect(reportData.dailyHours[12]).toEqual({
+				date: '2024-03-13',
+				minutes: 0,
+				projects: [],
+			})
+			expect(reportData.dailyHours[30]).toEqual({
+				date: '2024-03-31',
+				minutes: 0,
+				projects: [],
+			})
 			// Required: total reported hours
 			expect(reportData.totalMinutes).toBe(720)
 		})
@@ -183,7 +196,12 @@ describe('GET /api/reports/pdf', () => {
 			// Verify empty data is passed correctly
 			expect(spy).toHaveBeenCalledOnce()
 			const reportData = spy.mock.calls[0][0]
-			expect(reportData.dailyHours).toHaveLength(0)
+			expect(reportData.dailyHours).toHaveLength(30)
+			// Every day should have 0 minutes and no projects
+			for (const day of reportData.dailyHours) {
+				expect(day.minutes).toBe(0)
+				expect(day.projects).toEqual([])
+			}
 			expect(reportData.totalMinutes).toBe(0)
 		})
 	})

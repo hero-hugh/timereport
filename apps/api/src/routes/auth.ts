@@ -1,17 +1,46 @@
 import { requestOtpSchema, verifyOtpSchema } from '@time-report/shared'
+import type { Context } from 'hono'
 import { Hono } from 'hono'
-import { deleteCookie, setCookie } from 'hono/cookie'
+import { deleteCookie, getCookie, setCookie } from 'hono/cookie'
+import { rateLimiter } from 'hono-rate-limiter'
 import { JWT_CONFIG } from '../lib/jwt'
 import { getAuthUser, requireAuth } from '../middleware/auth'
 import { authService } from '../services/auth.service'
 
 const auth = new Hono()
 
+// Trust proxy headers i prod (nginx/Cloudflare framför); i dev använd connection.
+const clientKey = (c: Context): string =>
+	c.req.header('cf-connecting-ip') ??
+	c.req.header('x-forwarded-for')?.split(',')[0]?.trim() ??
+	c.req.header('x-real-ip') ??
+	'unknown'
+
+const skipInTest = (): boolean => process.env.NODE_ENV === 'test'
+
+const requestOtpLimiter = rateLimiter({
+	windowMs: 15 * 60 * 1000,
+	limit: 3,
+	standardHeaders: 'draft-6',
+	keyGenerator: clientKey,
+	skip: skipInTest,
+	message: { success: false, error: 'För många försök, vänta en stund' },
+})
+
+const verifyOtpLimiter = rateLimiter({
+	windowMs: 15 * 60 * 1000,
+	limit: 10,
+	standardHeaders: 'draft-6',
+	keyGenerator: clientKey,
+	skip: skipInTest,
+	message: { success: false, error: 'För många försök, vänta en stund' },
+})
+
 /**
  * POST /api/auth/request-otp
  * Begär OTP-kod till e-postadress
  */
-auth.post('/request-otp', async (c) => {
+auth.post('/request-otp', requestOtpLimiter, async (c) => {
 	const body = await c.req.json()
 	const parsed = requestOtpSchema.safeParse(body)
 
@@ -41,7 +70,7 @@ auth.post('/request-otp', async (c) => {
  * POST /api/auth/verify-otp
  * Verifiera OTP-kod och logga in
  */
-auth.post('/verify-otp', async (c) => {
+auth.post('/verify-otp', verifyOtpLimiter, async (c) => {
 	const body = await c.req.json()
 	const parsed = verifyOtpSchema.safeParse(body)
 
@@ -86,9 +115,7 @@ auth.post('/verify-otp', async (c) => {
  * Förnya access token med refresh token
  */
 auth.post('/refresh', async (c) => {
-	const refreshToken = c.req
-		.header('Cookie')
-		?.match(/refresh_token=([^;]+)/)?.[1]
+	const refreshToken = getCookie(c, 'refresh_token')
 
 	if (!refreshToken) {
 		return c.json({ success: false, error: 'Refresh token saknas' }, 401)
@@ -122,9 +149,7 @@ auth.post('/refresh', async (c) => {
  * Logga ut användare
  */
 auth.post('/logout', async (c) => {
-	const refreshToken = c.req
-		.header('Cookie')
-		?.match(/refresh_token=([^;]+)/)?.[1]
+	const refreshToken = getCookie(c, 'refresh_token')
 
 	if (refreshToken) {
 		await authService.logout(refreshToken)
