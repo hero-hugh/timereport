@@ -1,15 +1,42 @@
 #!/bin/sh
 set -e
 
-# Runs as root to fix ownership on the persistent /app/data volume
-# (volumes provisioned by older root-owned deploys won't be writable by the
-# unprivileged `app` user otherwise). Errors are ignored on read-only FS.
+# The persistent data dir is configured by CapRover. Fall back to /app/data
+# for local Docker runs that use the Dockerfile's VOLUME.
+DATA_DIR="${DATABASE_DIR:-/app/data}"
+
+echo "[entrypoint] v3 starting as UID=$(id -u)"
+echo "[entrypoint] DATA_DIR=$DATA_DIR"
+echo "[entrypoint] AUTH_DATABASE_URL=${AUTH_DATABASE_URL:-<unset>}"
+
+# Phase 1: running as root — normalize volume ownership, then drop to app.
 if [ "$(id -u)" = "0" ]; then
-	chown -R app:app /app/data 2>/dev/null || true
-	exec su-exec app "$0" "$@"
+	mkdir -p "$DATA_DIR"
+
+	echo "[entrypoint] $DATA_DIR before chown:"
+	ls -la "$DATA_DIR" 2>&1 || true
+
+	if chown -R app:app "$DATA_DIR" 2>&1; then
+		echo "[entrypoint] chown $DATA_DIR OK"
+	else
+		echo "[entrypoint] WARN: chown $DATA_DIR failed"
+	fi
+	chmod u+rwx,g+rwx "$DATA_DIR" 2>&1 || true
+
+	echo "[entrypoint] $DATA_DIR after chown:"
+	ls -la "$DATA_DIR" 2>&1 || true
+
+	# Verify app user can write; fall back to root if not (log loud warning).
+	if su-exec app sh -c "touch $DATA_DIR/.perm-test && rm $DATA_DIR/.perm-test" 2>/dev/null; then
+		echo "[entrypoint] app user can write — dropping privileges"
+		exec su-exec app "$0" "$@"
+	else
+		echo "[entrypoint] WARN: app cannot write to $DATA_DIR — running as root"
+	fi
 fi
 
-# Running as app user from here on.
+echo "[entrypoint] phase 2 running as UID=$(id -u)"
+
 npx prisma db push \
 	--schema=apps/api/prisma/central/schema.prisma \
 	--skip-generate

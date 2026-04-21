@@ -56,20 +56,21 @@ COPY --from=builder /app/packages/shared/dist/ ./packages/shared/dist/
 # Point shared package exports to compiled JS instead of TS source
 RUN sed -i 's|./src/index.ts|./dist/index.js|g' packages/shared/package.json
 
-# Create a non-root user and database directory with proper ownership
+# Create a non-root user. The entrypoint will chown the persistent data dir
+# at startup (it's mounted by the platform — on CapRover at /data, locally at
+# /app/data via the VOLUME directive below).
 RUN addgroup -S app -g 1001 && adduser -S app -G app -u 1001 \
-    && mkdir -p /app/data \
-    && chown -R app:app /app
+    && mkdir -p /app/data /data \
+    && chown -R app:app /app /data
 
-# Copy entrypoint that normalizes /app/data ownership then drops to `app`
+# Copy entrypoint that normalizes DATABASE_DIR ownership and drops to `app`
 COPY docker/api-entrypoint.sh /usr/local/bin/api-entrypoint.sh
 RUN chmod +x /usr/local/bin/api-entrypoint.sh
 
-# Mark data directory as a volume for persistence
+# Default volume path for local Docker runs (CapRover mounts /data instead)
 VOLUME ["/app/data"]
 
 EXPOSE 3000
 
-# Entrypoint starts as root, chowns the volume, then drops to `app` via su-exec.
-# This handles legacy volumes created by earlier root-owned deploys.
+# Entrypoint starts as root, chowns DATABASE_DIR, then drops to `app`.
 ENTRYPOINT ["/usr/local/bin/api-entrypoint.sh"]
