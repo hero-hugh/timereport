@@ -32,7 +32,9 @@ RUN cp -r apps/api/src/generated apps/api/dist/generated
 FROM node:20-alpine
 WORKDIR /app
 
-RUN apk add --no-cache openssl
+# su-exec lets the entrypoint drop from root (to chown the volume on startup)
+# down to the unprivileged app user that runs the server.
+RUN apk add --no-cache openssl su-exec
 
 ENV NODE_ENV=production
 
@@ -59,13 +61,15 @@ RUN addgroup -S app -g 1001 && adduser -S app -G app -u 1001 \
     && mkdir -p /app/data \
     && chown -R app:app /app
 
+# Copy entrypoint that normalizes /app/data ownership then drops to `app`
+COPY docker/api-entrypoint.sh /usr/local/bin/api-entrypoint.sh
+RUN chmod +x /usr/local/bin/api-entrypoint.sh
+
 # Mark data directory as a volume for persistence
 VOLUME ["/app/data"]
 
-USER app
-
 EXPOSE 3000
 
-# Push auth schema at startup, then start the server.
-# set -e ensures we don't silently start the server if the migration fails.
-CMD ["sh", "-c", "set -e && npx prisma db push --schema=apps/api/prisma/central/schema.prisma --skip-generate && exec node apps/api/dist/index.js"]
+# Entrypoint starts as root, chowns the volume, then drops to `app` via su-exec.
+# This handles legacy volumes created by earlier root-owned deploys.
+ENTRYPOINT ["/usr/local/bin/api-entrypoint.sh"]
