@@ -1,5 +1,6 @@
 import { serve } from '@hono/node-server'
 import { Hono } from 'hono'
+import { bodyLimit } from 'hono/body-limit'
 import { cors } from 'hono/cors'
 import { logger } from 'hono/logger'
 
@@ -55,6 +56,14 @@ app.use(
 	cors({
 		origin: ALLOWED_ORIGIN,
 		credentials: true,
+	}),
+)
+app.use(
+	'*',
+	bodyLimit({
+		maxSize: 100 * 1024, // 100 KB — alla nuvarande payloads är <4 KB
+		onError: (c) =>
+			c.json({ success: false, error: 'Request är för stor' }, 413),
 	}),
 )
 app.use('*', logger())

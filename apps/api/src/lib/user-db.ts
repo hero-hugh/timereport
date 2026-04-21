@@ -1,4 +1,4 @@
-import { execSync } from 'node:child_process'
+import { execFileSync } from 'node:child_process'
 import fs from 'node:fs'
 import path from 'node:path'
 import { PrismaClient } from '../generated/user/index.js'
@@ -6,6 +6,17 @@ import { PrismaClient } from '../generated/user/index.js'
 export type UserPrismaClient = PrismaClient
 
 const userDbCache = new Map<string, PrismaClient>()
+
+// Tillåter UUID v4 (xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx) och CUID-liknande
+// alfanumeriska ID:n. Avvisar path-separator, null-byte, escape-tecken och
+// allt annat som skulle kunna användas för path-traversal eller command-injection.
+const USER_ID_PATTERN = /^[a-z0-9][a-z0-9-]{7,63}$/i
+
+function assertValidUserId(userId: string): void {
+	if (!USER_ID_PATTERN.test(userId)) {
+		throw new Error('Invalid userId format')
+	}
+}
 
 function getDatabaseDir(): string {
 	const dir = process.env.DATABASE_DIR
@@ -16,6 +27,7 @@ function getDatabaseDir(): string {
 }
 
 function getUserDbPath(userId: string): string {
+	assertValidUserId(userId)
 	return path.join(getDatabaseDir(), `${userId}.db`)
 }
 
@@ -76,9 +88,17 @@ export async function createUserDatabase(userId: string): Promise<void> {
 		? prismaBin
 		: path.join(monorepoRoot, 'node_modules/.bin/prisma')
 
-	// Push the per-user schema to the new SQLite file
-	execSync(
-		`"${prismaCmd}" db push --schema="${schemaPath}" --skip-generate --accept-data-loss`,
+	// Push the per-user schema to the new SQLite file.
+	// execFileSync bypasses the shell entirely so path interpolation is safe.
+	execFileSync(
+		prismaCmd,
+		[
+			'db',
+			'push',
+			`--schema=${schemaPath}`,
+			'--skip-generate',
+			'--accept-data-loss',
+		],
 		{
 			env: {
 				...process.env,

@@ -24,15 +24,33 @@ describe('user-db', () => {
 
 	describe('getUserDb', () => {
 		it('should return the same client for the same userId', () => {
-			const client1 = getUserDb('user-1')
-			const client2 = getUserDb('user-1')
+			const client1 = getUserDb('test-user-1')
+			const client2 = getUserDb('test-user-1')
 			expect(client1).toBe(client2)
 		})
 
 		it('should return different clients for different userIds', () => {
-			const client1 = getUserDb('user-a')
-			const client2 = getUserDb('user-b')
+			const client1 = getUserDb('test-user-a')
+			const client2 = getUserDb('test-user-b')
 			expect(client1).not.toBe(client2)
+		})
+
+		it('rejects userIds containing path separators', () => {
+			expect(() => getUserDb('../../etc/passwd')).toThrow('Invalid userId')
+			expect(() => getUserDb('user/../../../etc')).toThrow('Invalid userId')
+			expect(() => getUserDb('user\\..\\..\\etc')).toThrow('Invalid userId')
+		})
+
+		it('rejects userIds with shell metacharacters', () => {
+			expect(() => getUserDb('user;rm -rf /')).toThrow('Invalid userId')
+			expect(() => getUserDb('user$(whoami)')).toThrow('Invalid userId')
+			expect(() => getUserDb('user`id`')).toThrow('Invalid userId')
+			expect(() => getUserDb('user|cat')).toThrow('Invalid userId')
+		})
+
+		it('rejects empty and null-byte userIds', () => {
+			expect(() => getUserDb('')).toThrow('Invalid userId')
+			expect(() => getUserDb('user\0null')).toThrow('Invalid userId')
 		})
 	})
 
