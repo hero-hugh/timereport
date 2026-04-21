@@ -64,6 +64,24 @@ export const pdfReportQuerySchema = z.object({
 	month: z.coerce.number().int().min(1).max(12),
 })
 
+export const weekEntriesQuerySchema = z.object({
+	date: z.string().date('Ogiltigt datumformat (YYYY-MM-DD)').optional(),
+})
+
+export const holidaysQuerySchema = z
+	.object({
+		year: z.coerce.number().int().min(1900).max(2100).optional(),
+		from: z.string().date('Ogiltigt from-datum (YYYY-MM-DD)').optional(),
+		to: z.string().date('Ogiltigt to-datum (YYYY-MM-DD)').optional(),
+	})
+	.refine(
+		(v) => (v.from === undefined) === (v.to === undefined),
+		{
+			message: 'from och to måste anges tillsammans',
+			path: ['from'],
+		},
+	)
+
 // User schemas
 export const updateUserSchema = z.object({
 	name: z.string().min(1).max(100).optional(),

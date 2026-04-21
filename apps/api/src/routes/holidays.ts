@@ -1,3 +1,4 @@
+import { holidaysQuerySchema } from '@time-report/shared'
 import { Hono } from 'hono'
 import { getHolidaysInRange, getSwedishHolidays } from '../lib/swedish-holidays'
 
@@ -12,13 +13,27 @@ const app = new Hono()
  * - from: Start date for range query (YYYY-MM-DD)
  * - to: End date for range query (YYYY-MM-DD)
  *
- * If from/to are provided, returns holidays in that range
- * Otherwise returns all holidays for the specified year
+ * If from/to are provided, returns holidays in that range.
+ * Otherwise returns all holidays for the specified year.
  */
 app.get('/', (c) => {
-	const year = c.req.query('year')
-	const from = c.req.query('from')
-	const to = c.req.query('to')
+	const parsed = holidaysQuerySchema.safeParse({
+		year: c.req.query('year'),
+		from: c.req.query('from'),
+		to: c.req.query('to'),
+	})
+
+	if (!parsed.success) {
+		return c.json(
+			{
+				success: false,
+				error: parsed.error.errors[0]?.message || 'Ogiltiga parametrar',
+			},
+			400,
+		)
+	}
+
+	const { year, from, to } = parsed.data
 
 	// Range query
 	if (from && to) {
@@ -33,18 +48,7 @@ app.get('/', (c) => {
 	}
 
 	// Year query
-	const targetYear = year ? Number.parseInt(year, 10) : new Date().getFullYear()
-
-	if (Number.isNaN(targetYear) || targetYear < 1900 || targetYear > 2100) {
-		return c.json(
-			{
-				success: false,
-				error: 'Ogiltigt år. Ange ett år mellan 1900 och 2100.',
-			},
-			400,
-		)
-	}
-
+	const targetYear = year ?? new Date().getFullYear()
 	const holidays = getSwedishHolidays(targetYear)
 
 	return c.json({

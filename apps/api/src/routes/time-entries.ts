@@ -2,6 +2,7 @@ import {
 	createTimeEntrySchema,
 	timeEntriesQuerySchema,
 	updateTimeEntrySchema,
+	weekEntriesQuerySchema,
 } from '@time-report/shared'
 import { Hono } from 'hono'
 import { getAuthUser, getAuthUserDb, requireAuth } from '../middleware/auth'
@@ -53,13 +54,25 @@ timeEntries.get('/', async (c) => {
 timeEntries.get('/week', async (c) => {
 	const { userId } = getAuthUser(c)
 	const userDb = getAuthUserDb(c)
-	const dateParam = c.req.query('date')
+
+	const parsed = weekEntriesQuerySchema.safeParse({
+		date: c.req.query('date'),
+	})
+	if (!parsed.success) {
+		return c.json(
+			{
+				success: false,
+				error: parsed.error.errors[0]?.message || 'Ogiltigt datum',
+			},
+			400,
+		)
+	}
 
 	// Default till denna vecka
 	let weekStart: Date
-	if (dateParam) {
+	if (parsed.data.date) {
 		// Parse as UTC to avoid timezone issues
-		weekStart = new Date(`${dateParam}T00:00:00.000Z`)
+		weekStart = new Date(`${parsed.data.date}T00:00:00.000Z`)
 	} else {
 		weekStart = new Date()
 		weekStart.setUTCHours(0, 0, 0, 0)

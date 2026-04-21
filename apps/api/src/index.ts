@@ -2,6 +2,8 @@ import { serve } from '@hono/node-server'
 import { Hono } from 'hono'
 import { bodyLimit } from 'hono/body-limit'
 import { cors } from 'hono/cors'
+import { csrf } from 'hono/csrf'
+import { HTTPException } from 'hono/http-exception'
 import { logger } from 'hono/logger'
 
 import auth from './routes/auth'
@@ -66,6 +68,14 @@ app.use(
 			c.json({ success: false, error: 'Request är för stor' }, 413),
 	}),
 )
+// CSRF: djupförsvar utöver SameSite=Strict. Verifierar Origin-header mot
+// tillåten frontend på state-ändrande metoder (POST/PUT/PATCH/DELETE).
+app.use(
+	'*',
+	csrf({
+		origin: ALLOWED_ORIGIN || undefined,
+	}),
+)
 app.use('*', logger())
 
 // Health check
@@ -89,6 +99,11 @@ app.notFound((c) => {
 
 // Error handler
 app.onError((err, c) => {
+	// HTTPException har redan en korrekt status/response (t.ex. 403 från CSRF,
+	// 429 från rate limiting). Släpp igenom den istället för att maska som 500.
+	if (err instanceof HTTPException) {
+		return err.getResponse()
+	}
 	console.error('Server error:', err)
 	const exposeDetails = process.env.NODE_ENV !== 'production'
 	return c.json(
