@@ -23,17 +23,25 @@ describe('JWT utilities', () => {
 	})
 
 	describe('createRefreshToken', () => {
-		it('should create a valid JWT token', async () => {
-			const token = await createRefreshToken(testPayload)
+		it('should create a valid JWT token with a jti', async () => {
+			const { token, jti } = await createRefreshToken(testPayload)
 			expect(token).toBeDefined()
 			expect(typeof token).toBe('string')
 			expect(token.split('.')).toHaveLength(3)
+			expect(typeof jti).toBe('string')
+			expect(jti.length).toBeGreaterThan(0)
 		})
 
 		it('should create different token than access token', async () => {
 			const accessToken = await createAccessToken(testPayload)
-			const refreshToken = await createRefreshToken(testPayload)
+			const { token: refreshToken } = await createRefreshToken(testPayload)
 			expect(accessToken).not.toBe(refreshToken)
+		})
+
+		it('should generate a unique jti per call', async () => {
+			const a = await createRefreshToken(testPayload)
+			const b = await createRefreshToken(testPayload)
+			expect(a.jti).not.toBe(b.jti)
 		})
 	})
 
@@ -53,20 +61,21 @@ describe('JWT utilities', () => {
 		})
 
 		it('should return null for refresh token', async () => {
-			const refreshToken = await createRefreshToken(testPayload)
+			const { token: refreshToken } = await createRefreshToken(testPayload)
 			const payload = await verifyAccessToken(refreshToken)
 			expect(payload).toBeNull()
 		})
 	})
 
 	describe('verifyRefreshToken', () => {
-		it('should verify a valid refresh token', async () => {
-			const token = await createRefreshToken(testPayload)
+		it('should verify a valid refresh token and expose jti', async () => {
+			const { token, jti } = await createRefreshToken(testPayload)
 			const payload = await verifyRefreshToken(token)
 
 			expect(payload).not.toBeNull()
 			expect(payload?.userId).toBe(testPayload.userId)
 			expect(payload?.email).toBe(testPayload.email)
+			expect(payload?.jti).toBe(jti)
 		})
 
 		it('should return null for invalid token', async () => {

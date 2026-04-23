@@ -238,7 +238,7 @@ describe('AuthService', () => {
 			const { createRefreshToken, getRefreshTokenExpiry } = await import(
 				'../lib/jwt'
 			)
-			const refreshToken = await createRefreshToken({
+			const { token: refreshToken, jti } = await createRefreshToken({
 				userId: user.id,
 				email: user.email,
 			})
@@ -247,6 +247,7 @@ describe('AuthService', () => {
 				data: {
 					userId: user.id,
 					refreshToken,
+					jti,
 					expiresAt: getRefreshTokenExpiry(),
 				},
 			})
@@ -263,6 +264,7 @@ describe('AuthService', () => {
 			})
 			expect(updatedSession?.refreshToken).toBe(result.newRefreshToken)
 			expect(updatedSession?.refreshToken).not.toBe(refreshToken)
+			expect(updatedSession?.jti).not.toBe(jti)
 		})
 
 		it('should return error for invalid refresh token', async () => {
@@ -270,6 +272,56 @@ describe('AuthService', () => {
 
 			expect(result.success).toBe(false)
 			expect(result.error).toBe('Ogiltig refresh token')
+		})
+
+		it('should invalidate all sessions on refresh token reuse', async () => {
+			const user = await authDb.user.create({
+				data: { email: 'reuse@example.com' },
+			})
+
+			const { createRefreshToken, getRefreshTokenExpiry } = await import(
+				'../lib/jwt'
+			)
+			// Session A — kommer roteras först, gamla token försöker sedan reuse.
+			const { token: tokenA, jti: jtiA } = await createRefreshToken({
+				userId: user.id,
+				email: user.email,
+			})
+			await authDb.session.create({
+				data: {
+					userId: user.id,
+					refreshToken: tokenA,
+					jti: jtiA,
+					expiresAt: getRefreshTokenExpiry(),
+				},
+			})
+			// Session B — separat enhet, ska också invalideras när reuse sker.
+			const { token: tokenB, jti: jtiB } = await createRefreshToken({
+				userId: user.id,
+				email: user.email,
+			})
+			await authDb.session.create({
+				data: {
+					userId: user.id,
+					refreshToken: tokenB,
+					jti: jtiB,
+					expiresAt: getRefreshTokenExpiry(),
+				},
+			})
+
+			// Legit rotation av session A
+			const rotated = await authService.refreshAccessToken(tokenA)
+			expect(rotated.success).toBe(true)
+
+			// Nu presenteras gamla tokenA igen — simulerad reuse
+			const reuseAttempt = await authService.refreshAccessToken(tokenA)
+			expect(reuseAttempt.success).toBe(false)
+
+			// Alla sessioner för användaren ska ha raderats
+			const remaining = await authDb.session.findMany({
+				where: { userId: user.id },
+			})
+			expect(remaining).toHaveLength(0)
 		})
 	})
 
@@ -283,6 +335,7 @@ describe('AuthService', () => {
 				data: {
 					userId: user.id,
 					refreshToken: 'test-refresh-token',
+					jti: 'test-jti-logout',
 					expiresAt: new Date(Date.now() + 86400000),
 				},
 			})
@@ -293,6 +346,55 @@ describe('AuthService', () => {
 				where: { id: session.id },
 			})
 			expect(deletedSession).toBeNull()
+		})
+	})
+
+	describe('verifyOtp email-bunden lockout', () => {
+		it('should lock email after 10 failed attempts regardless of IP', async () => {
+			const { hashOtpCode, getOtpExpiry } = await import('../lib/otp')
+
+			// Skapa 11 OTP-koder (en per försök) så att vi kan försöka gissa 11 gånger.
+			// I praktiken brute-forcar en angripare via många OTP-request → verify,
+			// vilket kringgår IP-rate-limit men inte e-post-lockout.
+			for (let i = 0; i < 11; i++) {
+				// Markera tidigare som använda, skapa ny aktiv.
+				await authDb.otpCode.updateMany({
+					where: { email: 'victim@example.com', used: false },
+					data: { used: true },
+				})
+				await authDb.otpCode.create({
+					data: {
+						email: 'victim@example.com',
+						codeHash: hashOtpCode('111111'),
+						expiresAt: getOtpExpiry(),
+					},
+				})
+
+				const result = await authService.verifyOtp(
+					'victim@example.com',
+					'999999',
+				)
+				expect(result.success).toBe(false)
+			}
+
+			// Skapa nu en giltig kod, försök logga in — ska fortfarande nekas p.g.a. lock.
+			await authDb.otpCode.updateMany({
+				where: { email: 'victim@example.com', used: false },
+				data: { used: true },
+			})
+			await authDb.otpCode.create({
+				data: {
+					email: 'victim@example.com',
+					codeHash: hashOtpCode('123456'),
+					expiresAt: getOtpExpiry(),
+				},
+			})
+			const lockedResult = await authService.verifyOtp(
+				'victim@example.com',
+				'123456',
+			)
+			expect(lockedResult.success).toBe(false)
+			expect(lockedResult.error).toBe('Ogiltig eller utgången kod')
 		})
 	})
 })

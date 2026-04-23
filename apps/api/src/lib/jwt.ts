@@ -39,18 +39,21 @@ export async function createAccessToken(
 }
 
 /**
- * Skapa refresh token (lång livstid)
- * Inkluderar jti (JWT ID) för att garantera unikhet vid token rotation
+ * Skapa refresh token. Returnerar både token och dess jti så att anroparen
+ * kan lagra jti i session-tabellen och senare upptäcka om en roterad token
+ * används igen (reuse detection).
  */
 export async function createRefreshToken(
 	payload: TokenPayload,
-): Promise<string> {
-	return new jose.SignJWT({ ...payload })
+): Promise<{ token: string; jti: string }> {
+	const jti = randomUUID()
+	const token = await new jose.SignJWT({ ...payload })
 		.setProtectedHeader({ alg: 'HS256' })
-		.setJti(randomUUID())
+		.setJti(jti)
 		.setIssuedAt()
 		.setExpirationTime(REFRESH_TOKEN_EXPIRY)
 		.sign(getRefreshSecret())
+	return { token, jti }
 }
 
 /**
@@ -71,16 +74,19 @@ export async function verifyAccessToken(
 }
 
 /**
- * Verifiera refresh token
+ * Verifiera refresh token. Returnerar även jti så att anroparen kan matcha
+ * mot den jti som lagrats i sessionen.
  */
 export async function verifyRefreshToken(
 	token: string,
-): Promise<TokenPayload | null> {
+): Promise<(TokenPayload & { jti: string }) | null> {
 	try {
 		const { payload } = await jose.jwtVerify(token, getRefreshSecret())
+		if (typeof payload.jti !== 'string') return null
 		return {
 			userId: payload.userId as string,
 			email: payload.email as string,
+			jti: payload.jti,
 		}
 	} catch {
 		return null

@@ -6,8 +6,17 @@ set -e
 DATA_DIR="${DATABASE_DIR:-/app/data}"
 
 echo "[entrypoint] v3 starting as UID=$(id -u)"
-echo "[entrypoint] DATA_DIR=$DATA_DIR"
-echo "[entrypoint] AUTH_DATABASE_URL=${AUTH_DATABASE_URL:-<unset>}"
+# Logga bara set/unset för env-vars som kan innehålla credentials (t.ex. en
+# framtida Postgres-URL), så de inte läcker till container-loggar.
+env_status() {
+	if [ -n "$2" ]; then
+		echo "[entrypoint] $1: set"
+	else
+		echo "[entrypoint] $1: <unset>"
+	fi
+}
+env_status "DATA_DIR" "$DATA_DIR"
+env_status "AUTH_DATABASE_URL" "$AUTH_DATABASE_URL"
 
 # Phase 1: running as root — normalize volume ownership, then drop to app.
 if [ "$(id -u)" = "0" ]; then

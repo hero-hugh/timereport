@@ -37,6 +37,7 @@ model Session {
   id           String   @id @default(uuid())
   userId       String
   refreshToken String   @unique
+  jti          String   @unique
   expiresAt    DateTime
   createdAt    DateTime @default(now())
 

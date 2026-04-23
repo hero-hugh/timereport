@@ -1,11 +1,13 @@
 import { serve } from '@hono/node-server'
-import { Hono } from 'hono'
+import { type Context, Hono } from 'hono'
+import { rateLimiter } from 'hono-rate-limiter'
 import { bodyLimit } from 'hono/body-limit'
 import { cors } from 'hono/cors'
 import { csrf } from 'hono/csrf'
 import { HTTPException } from 'hono/http-exception'
 import { logger } from 'hono/logger'
 
+import { requireAuth } from './middleware/auth'
 import auth from './routes/auth'
 import boxSync from './routes/box-sync'
 import holidays from './routes/holidays'
@@ -15,6 +17,18 @@ import timeEntries from './routes/time-entries'
 import user from './routes/user'
 
 // Startup-säkerhetsassertions — misconfig ska inte gå att missa i prod.
+// NODE_ENV måste vara exakt ett känt värde; annars baila ut. Detta skyddar
+// bland annat mot att cookie `secure`-flaggan (bunden till
+// NODE_ENV === 'production') tyst blir false vid stavfel som 'Production'
+// eller 'production ' (med trailing space).
+const VALID_NODE_ENVS = ['production', 'development', 'test'] as const
+type NodeEnv = (typeof VALID_NODE_ENVS)[number]
+if (!VALID_NODE_ENVS.includes(process.env.NODE_ENV as NodeEnv)) {
+	throw new Error(
+		`NODE_ENV must be one of ${VALID_NODE_ENVS.join(', ')} (got ${JSON.stringify(process.env.NODE_ENV)}).`,
+	)
+}
+
 if (process.env.NODE_ENV === 'production') {
 	if (process.env.E2E_TEST_OTP) {
 		throw new Error(
@@ -70,12 +84,9 @@ app.use(
 )
 // CSRF: djupförsvar utöver SameSite=Strict. Verifierar Origin-header mot
 // tillåten frontend på state-ändrande metoder (POST/PUT/PATCH/DELETE).
-app.use(
-	'*',
-	csrf({
-		origin: ALLOWED_ORIGIN || undefined,
-	}),
-)
+// Explicit origin — fallback till undefined skulle tillåta luddig Host-
+// jämförelse om FRONTEND_URL saknades (t.ex. vid dev-tunnel mot publikt IP).
+app.use('*', csrf({ origin: ALLOWED_ORIGIN }))
 app.use('*', logger())
 
 // Health check
@@ -83,8 +94,52 @@ app.get('/api/health', (c) => {
 	return c.json({ status: 'ok', timestamp: new Date().toISOString() })
 })
 
-// Routes
+// Ingen browser/proxy får cacha svar från APIet — skyddar mot att känsliga
+// projekt/tider/priser hamnar i browser-history eller mellanliggande caches.
+app.use('/api/*', async (c, next) => {
+	await next()
+	c.header('Cache-Control', 'no-store')
+	c.header('Pragma', 'no-cache')
+})
+
+// Global rate limit på alla autentiserade endpoints. En stulen access token
+// ska inte kunna exfiltrera hela kontot inom sekunder. Använder userId som
+// nyckel (fallback till IP om JWT saknas, vilket bara inträffar om requireAuth
+// inte körts).
+const clientIp = (c: Context): string =>
+	c.req.header('cf-connecting-ip') ??
+	c.req.header('x-forwarded-for')?.split(',')[0]?.trim() ??
+	c.req.header('x-real-ip') ??
+	'unknown'
+
+const authenticatedLimiter = rateLimiter({
+	windowMs: 60 * 1000,
+	limit: 300,
+	standardHeaders: 'draft-6',
+	keyGenerator: (c) => {
+		// `requireAuth` (kör innan limitern på samma path) sätter 'user' på
+		// contexten. Vi läser via any för att undvika att trassla in Hono:s
+		// Variables-generik i varje route-fil — typen definieras i middleware/auth.ts.
+		const user = (c as unknown as { get: (k: string) => unknown }).get(
+			'user',
+		) as { userId?: string } | undefined
+		return user?.userId ?? `ip:${clientIp(c)}`
+	},
+	skip: () => process.env.NODE_ENV === 'test',
+	message: { success: false, error: 'För många anrop, vänta en stund' },
+})
+
+// Routes — auth-endpointen har sina egna fin-kornade limiters i routes/auth.ts
 app.route('/api/auth', auth)
+
+// Alla data-endpoints: kräv auth, sedan rate limit per användare.
+app.use('/api/projects/*', requireAuth, authenticatedLimiter)
+app.use('/api/time-entries/*', requireAuth, authenticatedLimiter)
+app.use('/api/reports/*', requireAuth, authenticatedLimiter)
+app.use('/api/holidays/*', requireAuth, authenticatedLimiter)
+app.use('/api/user/*', requireAuth, authenticatedLimiter)
+app.use('/api/box/*', requireAuth, authenticatedLimiter)
+
 app.route('/api/projects', projects)
 app.route('/api/time-entries', timeEntries)
 app.route('/api/reports', reports)
