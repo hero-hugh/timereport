@@ -26,6 +26,11 @@ const failedByEmail = new Map<string, { count: number; lockedUntil: number }>()
 const MAX_EMAIL_FAILURES = 10
 const EMAIL_LOCK_MS = 30 * 60 * 1000 // 30 min
 
+// Tolerera replay av en alldeles nyss roterad refresh token inom detta
+// fönster — det är concurrent /refresh från parallella API-anrop, inte
+// ett angrepp. Utanför fönstret behandlas det som äkta token-reuse.
+const REFRESH_GRACE_WINDOW_MS = 30 * 1000
+
 function isEmailLocked(email: string): boolean {
 	const entry = failedByEmail.get(email)
 	if (!entry) return false
@@ -264,10 +269,36 @@ export class AuthService {
 		})
 
 		if (!session) {
+			// Kanske concurrent /refresh — en parallell tabb hann rotera
+			// medan denna förfrågan var in-flight med gamla jti:n. Tolerera
+			// replay av nyligen-roterad token inom REFRESH_GRACE_WINDOW_MS
+			// genom att returnera den nyss utfärdade refresh-tokenen.
+			const racedSession = await authDb.session.findUnique({
+				where: { previousJti: payload.jti },
+				include: { user: true },
+			})
+			if (
+				racedSession?.previousJtiAt &&
+				Date.now() - racedSession.previousJtiAt.getTime() <=
+					REFRESH_GRACE_WINDOW_MS &&
+				new Date() <= racedSession.expiresAt
+			) {
+				const tokenPayload = {
+					userId: racedSession.userId,
+					email: racedSession.user.email,
+				}
+				const newAccessToken = await createAccessToken(tokenPayload)
+				return {
+					success: true,
+					accessToken: newAccessToken,
+					newRefreshToken: racedSession.refreshToken,
+				}
+			}
+
 			// Token-signaturen är giltig (JWT secret har inte läckt), men den
-			// matchar ingen aktiv session. Kontrollera om användaren har
-			// ANDRA aktiva sessioner — i så fall har attackeraren använt en
-			// stulen, tidigare-roterad token. Invalidera allt.
+			// matchar varken aktiv session eller nyligen-roterad. Om användaren
+			// har andra aktiva sessioner är detta en stulen, tidigare-roterad
+			// token — invalidera allt och varna.
 			const otherSessions = await authDb.session.findMany({
 				where: { userId: payload.userId },
 				select: { id: true },
@@ -291,7 +322,8 @@ export class AuthService {
 
 		// Refresh token rotation — skapa nya tokens och uppdatera session
 		// atomärt. Att uppdatera jti samtidigt som refreshToken stänger ute
-		// den gamla tokenen omedelbart.
+		// den gamla tokenen omedelbart. previousJti + previousJtiAt sparas
+		// så att en parallell concurrent refresh kan accepteras inom grace.
 		const tokenPayload = { userId: session.userId, email: session.user.email }
 		const newAccessToken = await createAccessToken(tokenPayload)
 		const { token: newRefreshToken, jti: newJti } =
@@ -302,6 +334,8 @@ export class AuthService {
 			data: {
 				refreshToken: newRefreshToken,
 				jti: newJti,
+				previousJti: session.jti,
+				previousJtiAt: new Date(),
 				expiresAt: getRefreshTokenExpiry(),
 			},
 		})

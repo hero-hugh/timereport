@@ -34,12 +34,14 @@ model OtpCode {
 }
 
 model Session {
-  id           String   @id @default(uuid())
-  userId       String
-  refreshToken String   @unique
-  jti          String   @unique
-  expiresAt    DateTime
-  createdAt    DateTime @default(now())
+  id            String    @id @default(uuid())
+  userId        String
+  refreshToken  String    @unique
+  jti           String    @unique
+  previousJti   String?   @unique
+  previousJtiAt DateTime?
+  expiresAt     DateTime
+  createdAt     DateTime  @default(now())
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 

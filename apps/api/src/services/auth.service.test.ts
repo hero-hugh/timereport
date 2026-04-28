@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { authDb } from '../lib/auth-db'
+import * as emailLib from '../lib/email'
 import { authService } from './auth.service'
 
 vi.mock('../lib/user-db', () => ({
@@ -7,6 +8,10 @@ vi.mock('../lib/user-db', () => ({
 	getUserDb: vi.fn(),
 	disconnectAllUserDbs: vi.fn(),
 }))
+
+beforeEach(() => {
+	vi.restoreAllMocks()
+})
 
 describe('AuthService', () => {
 	describe('requestOtp', () => {
@@ -274,7 +279,56 @@ describe('AuthService', () => {
 			expect(result.error).toBe('Ogiltig refresh token')
 		})
 
-		it('should invalidate all sessions on refresh token reuse', async () => {
+		it('should tolerate replay of just-rotated token within grace window (concurrent refresh)', async () => {
+			const alertSpy = vi
+				.spyOn(emailLib, 'sendSecurityAlertEmail')
+				.mockResolvedValue(undefined)
+
+			const user = await authDb.user.create({
+				data: { email: 'race@example.com' },
+			})
+
+			const { createRefreshToken, getRefreshTokenExpiry } = await import(
+				'../lib/jwt'
+			)
+			const { token: tokenA, jti: jtiA } = await createRefreshToken({
+				userId: user.id,
+				email: user.email,
+			})
+			const session = await authDb.session.create({
+				data: {
+					userId: user.id,
+					refreshToken: tokenA,
+					jti: jtiA,
+					expiresAt: getRefreshTokenExpiry(),
+				},
+			})
+
+			// Tabb 1: roterar tokenA → tokenB.
+			const rotated = await authService.refreshAccessToken(tokenA)
+			expect(rotated.success).toBe(true)
+
+			// Tabb 2: var redan in-flight med tokenA, hinner inte se ny cookie.
+			const raced = await authService.refreshAccessToken(tokenA)
+			expect(raced.success).toBe(true)
+			expect(raced.accessToken).toBeDefined()
+			// Race-svaret returnerar samma redan-utfärdade refresh token, inte ny.
+			expect(raced.newRefreshToken).toBe(rotated.newRefreshToken)
+
+			// Inget mejl, sessionen är intakt.
+			expect(alertSpy).not.toHaveBeenCalled()
+			const remaining = await authDb.session.findMany({
+				where: { userId: user.id },
+			})
+			expect(remaining).toHaveLength(1)
+			expect(remaining[0]?.id).toBe(session.id)
+		})
+
+		it('should invalidate all sessions when reused outside grace window', async () => {
+			const alertSpy = vi
+				.spyOn(emailLib, 'sendSecurityAlertEmail')
+				.mockResolvedValue(undefined)
+
 			const user = await authDb.user.create({
 				data: { email: 'reuse@example.com' },
 			})
@@ -282,7 +336,6 @@ describe('AuthService', () => {
 			const { createRefreshToken, getRefreshTokenExpiry } = await import(
 				'../lib/jwt'
 			)
-			// Session A — kommer roteras först, gamla token försöker sedan reuse.
 			const { token: tokenA, jti: jtiA } = await createRefreshToken({
 				userId: user.id,
 				email: user.email,
@@ -313,11 +366,60 @@ describe('AuthService', () => {
 			const rotated = await authService.refreshAccessToken(tokenA)
 			expect(rotated.success).toBe(true)
 
-			// Nu presenteras gamla tokenA igen — simulerad reuse
+			// Skicka tillbaka previousJtiAt utanför grace-fönstret för att
+			// simulera ett angrepp som dyker upp långt efter rotationen.
+			await authDb.session.updateMany({
+				where: { previousJti: jtiA },
+				data: { previousJtiAt: new Date(Date.now() - 60 * 1000) },
+			})
+
 			const reuseAttempt = await authService.refreshAccessToken(tokenA)
 			expect(reuseAttempt.success).toBe(false)
+			expect(alertSpy).toHaveBeenCalledTimes(1)
 
-			// Alla sessioner för användaren ska ha raderats
+			const remaining = await authDb.session.findMany({
+				where: { userId: user.id },
+			})
+			expect(remaining).toHaveLength(0)
+		})
+
+		it('should alert when an unknown jti is presented while other sessions exist', async () => {
+			const alertSpy = vi
+				.spyOn(emailLib, 'sendSecurityAlertEmail')
+				.mockResolvedValue(undefined)
+
+			const user = await authDb.user.create({
+				data: { email: 'orphan@example.com' },
+			})
+
+			const { createRefreshToken, getRefreshTokenExpiry } = await import(
+				'../lib/jwt'
+			)
+			// Aktiv session för användaren.
+			const { token: liveToken, jti: liveJti } = await createRefreshToken({
+				userId: user.id,
+				email: user.email,
+			})
+			await authDb.session.create({
+				data: {
+					userId: user.id,
+					refreshToken: liveToken,
+					jti: liveJti,
+					expiresAt: getRefreshTokenExpiry(),
+				},
+			})
+
+			// Token med giltig signatur men jti som varken är aktiv eller
+			// previous — t.ex. en stulen token från en session som raderats.
+			const { token: orphan } = await createRefreshToken({
+				userId: user.id,
+				email: user.email,
+			})
+
+			const result = await authService.refreshAccessToken(orphan)
+			expect(result.success).toBe(false)
+			expect(alertSpy).toHaveBeenCalledTimes(1)
+
 			const remaining = await authDb.session.findMany({
 				where: { userId: user.id },
 			})
