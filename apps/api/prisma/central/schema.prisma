@@ -38,7 +38,7 @@ model Session {
   userId        String
   refreshToken  String    @unique
   jti           String    @unique
-  previousJti   String?   @unique
+  previousJti   String?
   previousJtiAt DateTime?
   expiresAt     DateTime
   createdAt     DateTime  @default(now())
@@ -46,4 +46,5 @@ model Session {
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId])
+  @@index([previousJti])
 }

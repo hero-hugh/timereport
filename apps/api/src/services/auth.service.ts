@@ -273,7 +273,7 @@ export class AuthService {
 			// medan denna förfrågan var in-flight med gamla jti:n. Tolerera
 			// replay av nyligen-roterad token inom REFRESH_GRACE_WINDOW_MS
 			// genom att returnera den nyss utfärdade refresh-tokenen.
-			const racedSession = await authDb.session.findUnique({
+			const racedSession = await authDb.session.findFirst({
 				where: { previousJti: payload.jti },
 				include: { user: true },
 			})
