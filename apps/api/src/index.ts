@@ -30,6 +30,24 @@ if (!VALID_NODE_ENVS.includes(process.env.NODE_ENV as NodeEnv)) {
 	)
 }
 
+// Samma fälla för TRUST_CLOUDFLARE_HEADERS, som avgör om CF-Connecting-IP får
+// användas som rate-limit-nyckel (se lib/client-ip.ts). Jämförelsen där är
+// exakt mot 'true', så ett stavfel som 'True' eller '1' blir tyst false:
+// variabeln ser påslagen ut i CapRovers UI medan koden ignorerar den. Det
+// märks först när alla besökare hamnar i samma hink bakom Cloudflares edge-IP
+// och OTP-limitern låser inloggningen för alla. Tomt värde = osatt.
+const TRUST_CF_HEADERS = process.env.TRUST_CLOUDFLARE_HEADERS
+if (
+	TRUST_CF_HEADERS !== undefined &&
+	TRUST_CF_HEADERS !== '' &&
+	TRUST_CF_HEADERS !== 'true' &&
+	TRUST_CF_HEADERS !== 'false'
+) {
+	throw new Error(
+		`TRUST_CLOUDFLARE_HEADERS must be exactly 'true' or 'false' (got ${JSON.stringify(TRUST_CF_HEADERS)}).`,
+	)
+}
+
 if (process.env.NODE_ENV === 'production') {
 	if (process.env.E2E_TEST_OTP) {
 		throw new Error(
