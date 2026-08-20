@@ -1,20 +1,13 @@
 import { requestOtpSchema, verifyOtpSchema } from '@time-report/shared'
-import type { Context } from 'hono'
 import { Hono } from 'hono'
-import { deleteCookie, getCookie, setCookie } from 'hono/cookie'
 import { rateLimiter } from 'hono-rate-limiter'
+import { deleteCookie, getCookie, setCookie } from 'hono/cookie'
+import { getClientIp } from '../lib/client-ip'
 import { JWT_CONFIG } from '../lib/jwt'
 import { getAuthUser, requireAuth } from '../middleware/auth'
 import { authService } from '../services/auth.service'
 
 const auth = new Hono()
-
-// Trust proxy headers i prod (nginx/Cloudflare framför); i dev använd connection.
-const clientKey = (c: Context): string =>
-	c.req.header('cf-connecting-ip') ??
-	c.req.header('x-forwarded-for')?.split(',')[0]?.trim() ??
-	c.req.header('x-real-ip') ??
-	'unknown'
 
 const skipInTest = (): boolean => process.env.NODE_ENV === 'test'
 
@@ -22,7 +15,7 @@ const requestOtpLimiter = rateLimiter({
 	windowMs: 15 * 60 * 1000,
 	limit: 3,
 	standardHeaders: 'draft-6',
-	keyGenerator: clientKey,
+	keyGenerator: getClientIp,
 	skip: skipInTest,
 	message: { success: false, error: 'För många försök, vänta en stund' },
 })
@@ -31,7 +24,7 @@ const verifyOtpLimiter = rateLimiter({
 	windowMs: 15 * 60 * 1000,
 	limit: 10,
 	standardHeaders: 'draft-6',
-	keyGenerator: clientKey,
+	keyGenerator: getClientIp,
 	skip: skipInTest,
 	message: { success: false, error: 'För många försök, vänta en stund' },
 })

@@ -1,5 +1,5 @@
 import { serve } from '@hono/node-server'
-import { type Context, Hono } from 'hono'
+import { Hono } from 'hono'
 import { rateLimiter } from 'hono-rate-limiter'
 import { bodyLimit } from 'hono/body-limit'
 import { cors } from 'hono/cors'
@@ -7,6 +7,7 @@ import { csrf } from 'hono/csrf'
 import { HTTPException } from 'hono/http-exception'
 import { logger } from 'hono/logger'
 
+import { getClientIp } from './lib/client-ip'
 import { requireAuth } from './middleware/auth'
 import auth from './routes/auth'
 import boxSync from './routes/box-sync'
@@ -62,6 +63,17 @@ if (process.env.NODE_ENV === 'production') {
 
 const app = new Hono()
 
+// APIet svarar bara under /api/. Scanner-botar hamrar konstant på /xxx.php,
+// /wp-admin och liknande — de avvisas här, före logger, CORS, CSRF och
+// body-parsing, så att de varken kostar arbete eller dränker loggarna.
+// (Grovsållningen bör helst ske i nginx/Cloudflare framför; detta är backstop.)
+app.use('*', async (c, next) => {
+	if (!c.req.path.startsWith('/api/')) {
+		return c.body(null, 404)
+	}
+	await next()
+})
+
 const ALLOWED_ORIGIN =
 	process.env.FRONTEND_URL ||
 	(process.env.NODE_ENV === 'production' ? '' : 'http://localhost:5173')
@@ -106,12 +118,6 @@ app.use('/api/*', async (c, next) => {
 // ska inte kunna exfiltrera hela kontot inom sekunder. Använder userId som
 // nyckel (fallback till IP om JWT saknas, vilket bara inträffar om requireAuth
 // inte körts).
-const clientIp = (c: Context): string =>
-	c.req.header('cf-connecting-ip') ??
-	c.req.header('x-forwarded-for')?.split(',')[0]?.trim() ??
-	c.req.header('x-real-ip') ??
-	'unknown'
-
 const authenticatedLimiter = rateLimiter({
 	windowMs: 60 * 1000,
 	limit: 300,
@@ -123,7 +129,7 @@ const authenticatedLimiter = rateLimiter({
 		const user = (c as unknown as { get: (k: string) => unknown }).get(
 			'user',
 		) as { userId?: string } | undefined
-		return user?.userId ?? `ip:${clientIp(c)}`
+		return user?.userId ?? `ip:${getClientIp(c)}`
 	},
 	skip: () => process.env.NODE_ENV === 'test',
 	message: { success: false, error: 'För många anrop, vänta en stund' },
