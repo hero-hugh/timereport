@@ -1,6 +1,7 @@
 import { Hono } from 'hono'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { pdfService } from '../services/pdf.service'
+import { createTestSession } from '../test/session'
 import { testUserDb } from '../test/test-user-db'
 
 vi.mock('../lib/jwt', () => ({
@@ -25,7 +26,9 @@ async function authenticateRequest() {
 	const { verifyAccessToken } = await import('../lib/jwt')
 	const { getUserDb } = await import('../lib/user-db')
 
+	const session = await createTestSession('test-user-id')
 	vi.mocked(verifyAccessToken).mockResolvedValueOnce({
+		sessionId: session.id,
 		userId: 'test-user-id',
 		email: 'test@example.com',
 	})

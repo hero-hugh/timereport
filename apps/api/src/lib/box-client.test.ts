@@ -62,14 +62,14 @@ describe('fetchBoxGraphQL', () => {
 			(e: unknown) => e,
 		)
 		expect(error).toBeInstanceOf(BoxApiError)
-		expect((error as BoxApiError).message).toContain('Network error')
+		expect((error as BoxApiError).message).toBe('BOX request failed: network')
 	})
 
 	it('throws BoxApiError on non-OK HTTP status', async () => {
 		mockFetchResponse({}, 500)
 
 		await expect(fetchBoxGraphQL('token', 'query { test }')).rejects.toThrow(
-			'BOX API returned status 500',
+			'BOX request failed: upstream',
 		)
 	})
 
@@ -80,7 +80,7 @@ describe('fetchBoxGraphQL', () => {
 		})
 
 		await expect(fetchBoxGraphQL('token', 'query { bad }')).rejects.toThrow(
-			'Invalid query',
+			'BOX request failed: upstream',
 		)
 	})
 
@@ -88,7 +88,59 @@ describe('fetchBoxGraphQL', () => {
 		mockFetchResponse({ data: null })
 
 		await expect(fetchBoxGraphQL('token', 'query { test }')).rejects.toThrow(
-			'BOX API returned empty response',
+			'BOX request failed: upstream',
+		)
+	})
+
+	it.each(['upstream', 'hours'] as const)(
+		'discards sensitive GraphQL details for %s errors',
+		async (category) => {
+			const secret = 'synthetic-secret@internal-db.example/private/path'
+			mockFetchResponse({ errors: [{ message: `${category}: ${secret}` }] })
+			const error = await fetchBoxGraphQL('token', 'query { test }').catch(
+				(e: unknown) => e,
+			)
+			expect(error).toBeInstanceOf(BoxApiError)
+			expect((error as BoxApiError).category).toBe(category)
+			expect(String(error)).not.toContain(secret)
+			expect(JSON.stringify(error)).not.toContain(secret)
+			expect((error as Error).cause).toBeUndefined()
+		},
+	)
+
+	it('discards sensitive fetch exceptions', async () => {
+		const secret = 'synthetic-token@internal-proxy.example'
+		fetchMock.mockRejectedValueOnce(new Error(secret))
+		const error = await fetchBoxGraphQL('token', 'query { test }').catch(
+			(e: unknown) => e,
+		)
+		expect(String(error)).toBe('BoxApiError: BOX request failed: network')
+		expect(JSON.stringify(error)).not.toContain(secret)
+		expect((error as Error).cause).toBeUndefined()
+	})
+
+	it.each([401, 403])(
+		'classifies HTTP %i without retaining the response body',
+		async (status) => {
+			mockFetchResponse({ secret: 'synthetic-sensitive-error' }, status)
+			await expect(
+				fetchBoxGraphQL('token', 'query { test }'),
+			).rejects.toMatchObject({
+				category: 'authentication',
+				message: 'BOX request failed: authentication',
+			})
+		},
+	)
+
+	it('masks invalid JSON errors', async () => {
+		fetchMock.mockResolvedValueOnce({
+			ok: true,
+			json: () => {
+				throw new Error('synthetic-sensitive-body')
+			},
+		})
+		await expect(fetchBoxGraphQL('token', 'query { test }')).rejects.toThrow(
+			'BOX request failed: upstream',
 		)
 	})
 })

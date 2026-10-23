@@ -69,9 +69,16 @@ interface BoxGraphQLResponse<T> {
 	errors?: Array<{ message: string }>
 }
 
+export type BoxErrorCategory =
+	| 'network'
+	| 'authentication'
+	| 'hours'
+	| 'upstream'
+
 export class BoxApiError extends Error {
-	constructor(message: string) {
-		super(message)
+	constructor(readonly category: BoxErrorCategory) {
+		// Never retain upstream messages, response bodies or fetch exception details.
+		super(`BOX request failed: ${category}`)
 		this.name = 'BoxApiError'
 	}
 }
@@ -91,26 +98,34 @@ export async function fetchBoxGraphQL<T>(
 			},
 			body: JSON.stringify({ query, variables }),
 		})
-	} catch (error) {
+	} catch {
+		throw new BoxApiError('network')
+	}
+	if (!response.ok) {
 		throw new BoxApiError(
-			`Network error: ${error instanceof Error ? error.message : 'Unknown error'}`,
+			response.status === 401 || response.status === 403
+				? 'authentication'
+				: 'upstream',
 		)
 	}
 
-	if (!response.ok) {
-		throw new BoxApiError(`BOX API returned status ${response.status}`)
+	let result: BoxGraphQLResponse<T>
+	try {
+		result = (await response.json()) as BoxGraphQLResponse<T>
+	} catch {
+		throw new BoxApiError('upstream')
 	}
-
-	const result = (await response.json()) as BoxGraphQLResponse<T>
-
-	if (result.errors?.length) {
-		throw new BoxApiError(result.errors[0].message)
+	if (!result || typeof result !== 'object') throw new BoxApiError('upstream')
+	if (Array.isArray(result.errors) && result.errors.length) {
+		const message = result.errors[0]?.message
+		// Preserve the existing friendly validation hint, but never its raw text.
+		throw new BoxApiError(
+			typeof message === 'string' && /\bhours\b/i.test(message)
+				? 'hours'
+				: 'upstream',
+		)
 	}
-
-	if (!result.data) {
-		throw new BoxApiError('BOX API returned empty response')
-	}
-
+	if (!result.data) throw new BoxApiError('upstream')
 	return result.data
 }
 

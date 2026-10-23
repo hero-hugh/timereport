@@ -1,5 +1,5 @@
 import { Hono } from 'hono'
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { authDb } from '../lib/auth-db'
 import {
 	BoxApiError,
@@ -7,6 +7,7 @@ import {
 	type TimeReportNode,
 } from '../lib/box-client'
 import { encryptSecret } from '../lib/crypto'
+import { createTestSession } from '../test/session'
 import { testUserDb } from '../test/test-user-db'
 
 vi.mock('../lib/jwt', () => ({
@@ -30,6 +31,10 @@ vi.mock('../lib/box-client', async (importOriginal) => {
 
 const { default: boxSync } = await import('./box-sync')
 
+afterEach(() => {
+	vi.unstubAllGlobals()
+})
+
 function createApp() {
 	const app = new Hono()
 	app.route('/api/box', boxSync)
@@ -40,7 +45,9 @@ async function authenticateRequest(userId = 'test-user-id') {
 	const { verifyAccessToken } = await import('../lib/jwt')
 	const { getUserDb } = await import('../lib/user-db')
 
+	const session = await createTestSession(userId)
 	vi.mocked(verifyAccessToken).mockResolvedValueOnce({
+		sessionId: session.id,
 		userId,
 		email: 'test@example.com',
 	})
@@ -352,9 +359,7 @@ describe('POST /api/box/sync', () => {
 		await authenticateRequest()
 
 		const { getTimeReports } = await import('../lib/box-client')
-		vi.mocked(getTimeReports).mockRejectedValueOnce(
-			new BoxApiError('Network error: fetch failed'),
-		)
+		vi.mocked(getTimeReports).mockRejectedValueOnce(new BoxApiError('network'))
 
 		const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
 
@@ -373,7 +378,7 @@ describe('POST /api/box/sync', () => {
 		expect(body.error).toBe('Nätverksfel - försök igen')
 		expect(consoleSpy).toHaveBeenCalledWith(
 			'BOX API error fetching time reports:',
-			'Network error: fetch failed',
+			'network',
 		)
 		consoleSpy.mockRestore()
 	})
@@ -384,7 +389,7 @@ describe('POST /api/box/sync', () => {
 
 		const { getTimeReports } = await import('../lib/box-client')
 		vi.mocked(getTimeReports).mockRejectedValueOnce(
-			new BoxApiError('BOX API returned status 401'),
+			new BoxApiError('authentication'),
 		)
 
 		const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
@@ -414,9 +419,7 @@ describe('POST /api/box/sync', () => {
 			await import('../lib/box-client')
 		vi.mocked(getTimeReports).mockResolvedValueOnce([MOCK_BOX_LISTING_REPORT])
 		vi.mocked(getSingleTimeReport).mockResolvedValueOnce(MOCK_BOX_REPORT)
-		vi.mocked(updateTimeReport).mockRejectedValueOnce(
-			new BoxApiError('Invalid hours format'),
-		)
+		vi.mocked(updateTimeReport).mockRejectedValueOnce(new BoxApiError('hours'))
 
 		const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
 
@@ -435,14 +438,24 @@ describe('POST /api/box/sync', () => {
 		consoleSpy.mockRestore()
 	})
 
-	it('returns 502 with BOX error message for other GraphQL errors', async () => {
+	it('returns a fixed public message for unexpected GraphQL errors', async () => {
 		await createTestUserWithToken()
 		await authenticateRequest()
 
 		const { getTimeReports } = await import('../lib/box-client')
-		vi.mocked(getTimeReports).mockRejectedValueOnce(
-			new BoxApiError('Some unexpected GraphQL error'),
+		const actual =
+			await vi.importActual<typeof import('../lib/box-client')>(
+				'../lib/box-client',
+			)
+		const sensitiveDetail = 'synthetic-token@internal-db.example/private/path'
+		vi.stubGlobal(
+			'fetch',
+			vi.fn().mockResolvedValue({
+				ok: true,
+				json: async () => ({ errors: [{ message: sensitiveDetail }] }),
+			}),
 		)
+		vi.mocked(getTimeReports).mockImplementationOnce(actual.getTimeReports)
 
 		const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
 
@@ -457,7 +470,13 @@ describe('POST /api/box/sync', () => {
 		expect(res.status).toBe(502)
 
 		const body = (await res.json()) as { success: boolean; error: string }
-		expect(body.error).toBe('Some unexpected GraphQL error')
+		expect(body.error).toBe('Kunde inte skicka till BOX - försök igen senare')
+		expect(JSON.stringify(body)).not.toContain(sensitiveDetail)
+		expect(JSON.stringify(consoleSpy.mock.calls)).not.toContain(sensitiveDetail)
+		expect(consoleSpy).toHaveBeenCalledWith(
+			'BOX API error fetching time reports:',
+			'upstream',
+		)
 		consoleSpy.mockRestore()
 	})
 

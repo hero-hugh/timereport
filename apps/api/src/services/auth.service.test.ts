@@ -1,6 +1,10 @@
+import { Hono } from 'hono'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { authDb } from '../lib/auth-db'
 import * as emailLib from '../lib/email'
+import { hashRefreshToken, verifyRefreshToken } from '../lib/jwt'
+import { getOtpExpiry, hashOtpCode } from '../lib/otp'
+import { requireAuth } from '../middleware/auth'
 import { authService } from './auth.service'
 
 vi.mock('../lib/user-db', () => ({
@@ -8,6 +12,11 @@ vi.mock('../lib/user-db', () => ({
 	getUserDb: vi.fn(),
 	disconnectAllUserDbs: vi.fn(),
 }))
+
+function required<T>(value: T | null | undefined): T {
+	if (value == null) throw new Error('Missing test fixture value')
+	return value
+}
 
 beforeEach(() => {
 	vi.restoreAllMocks()
@@ -233,221 +242,216 @@ describe('AuthService', () => {
 		})
 	})
 
-	describe('refreshAccessToken', () => {
-		it('should return new tokens for valid refresh token', async () => {
-			// Skapa användare och session
-			const user = await authDb.user.create({
-				data: { email: 'test@example.com' },
-			})
-
-			const { createRefreshToken, getRefreshTokenExpiry } = await import(
-				'../lib/jwt'
-			)
-			const { token: refreshToken, jti } = await createRefreshToken({
-				userId: user.id,
-				email: user.email,
-			})
-
-			const session = await authDb.session.create({
+	describe('session security', () => {
+		async function login(email = 'session@example.test') {
+			await authDb.otpCode.create({
 				data: {
-					userId: user.id,
-					refreshToken,
-					jti,
-					expiresAt: getRefreshTokenExpiry(),
+					email,
+					codeHash: hashOtpCode('123456'),
+					expiresAt: getOtpExpiry(),
 				},
 			})
-
-			const result = await authService.refreshAccessToken(refreshToken)
-
+			const result = await authService.verifyOtp(email, '123456')
 			expect(result.success).toBe(true)
-			expect(result.accessToken).toBeDefined()
-			expect(result.newRefreshToken).toBeDefined()
+			if (!result.accessToken || !result.refreshToken || !result.user)
+				throw new Error('Login fixture failed')
+			return {
+				accessToken: result.accessToken,
+				refreshToken: result.refreshToken,
+				userId: result.user.id,
+			}
+		}
 
-			// Verifiera att sessionen uppdaterades med ny refresh token
-			const updatedSession = await authDb.session.findUnique({
-				where: { id: session.id },
-			})
-			expect(updatedSession?.refreshToken).toBe(result.newRefreshToken)
-			expect(updatedSession?.refreshToken).not.toBe(refreshToken)
-			expect(updatedSession?.jti).not.toBe(jti)
+		const protectedApp = new Hono()
+		protectedApp.get('/', requireAuth, (c) => c.json({ ok: true }))
+		const accessStatus = async (token: string) =>
+			(
+				await protectedApp.request('/', {
+					headers: { Authorization: `Bearer ${token}` },
+				})
+			).status
+
+		it('stores only a digest and rotates to a different refresh token', async () => {
+			const original = await login()
+			const before = await authDb.session.findFirstOrThrow()
+			expect(before.refreshTokenHash).toBe(
+				hashRefreshToken(original.refreshToken),
+			)
+			expect(JSON.stringify(before)).not.toContain(original.refreshToken)
+			const next = await authService.refreshAccessToken(original.refreshToken)
+			expect(next.success).toBe(true)
+			expect(next.newRefreshToken).not.toBe(original.refreshToken)
+			const after = await authDb.session.findFirstOrThrow()
+			expect(after.refreshTokenHash).toBe(
+				hashRefreshToken(required(next.newRefreshToken)),
+			)
+			expect(JSON.stringify(after)).not.toContain(
+				required(next.newRefreshToken),
+			)
 		})
 
-		it('should return error for invalid refresh token', async () => {
-			const result = await authService.refreshAccessToken('invalid-token')
-
-			expect(result.success).toBe(false)
-			expect(result.error).toBe('Ogiltig refresh token')
-		})
-
-		it('should tolerate replay of just-rotated token within grace window (concurrent refresh)', async () => {
-			const alertSpy = vi
+		it('returns the same winning token to concurrent refresh requests', async () => {
+			const original = await login()
+			const alert = vi
 				.spyOn(emailLib, 'sendSecurityAlertEmail')
 				.mockResolvedValue(undefined)
-
-			const user = await authDb.user.create({
-				data: { email: 'race@example.com' },
-			})
-
-			const { createRefreshToken, getRefreshTokenExpiry } = await import(
-				'../lib/jwt'
+			const results = await Promise.all(
+				Array.from({ length: 8 }, () =>
+					authService.refreshAccessToken(original.refreshToken),
+				),
 			)
-			const { token: tokenA, jti: jtiA } = await createRefreshToken({
-				userId: user.id,
-				email: user.email,
-			})
-			const session = await authDb.session.create({
-				data: {
-					userId: user.id,
-					refreshToken: tokenA,
-					jti: jtiA,
-					expiresAt: getRefreshTokenExpiry(),
-				},
-			})
-
-			// Tabb 1: roterar tokenA → tokenB.
-			const rotated = await authService.refreshAccessToken(tokenA)
-			expect(rotated.success).toBe(true)
-
-			// Tabb 2: var redan in-flight med tokenA, hinner inte se ny cookie.
-			const raced = await authService.refreshAccessToken(tokenA)
-			expect(raced.success).toBe(true)
-			expect(raced.accessToken).toBeDefined()
-			// Race-svaret returnerar samma redan-utfärdade refresh token, inte ny.
-			expect(raced.newRefreshToken).toBe(rotated.newRefreshToken)
-
-			// Inget mejl, sessionen är intakt.
-			expect(alertSpy).not.toHaveBeenCalled()
-			const remaining = await authDb.session.findMany({
-				where: { userId: user.id },
-			})
-			expect(remaining).toHaveLength(1)
-			expect(remaining[0]?.id).toBe(session.id)
+			expect(results.every((r) => r.success)).toBe(true)
+			expect(new Set(results.map((r) => r.newRefreshToken)).size).toBe(1)
+			expect(await authDb.session.count()).toBe(1)
+			expect(alert).not.toHaveBeenCalled()
+			const retry = await authService.refreshAccessToken(
+				required(results[0].newRefreshToken),
+			)
+			expect(retry.newRefreshToken).toBe(results[0].newRefreshToken)
 		})
 
-		it('should invalidate all sessions when reused outside grace window', async () => {
-			const alertSpy = vi
+		it('reissues the current token during grace without extending its expiry', async () => {
+			const original = await login()
+			const next = await authService.refreshAccessToken(original.refreshToken)
+			const before = await authDb.session.findFirstOrThrow()
+			const retry = await authService.refreshAccessToken(original.refreshToken)
+			expect(retry.success).toBe(true)
+			expect(retry.newRefreshToken).toBe(next.newRefreshToken)
+			expect((await authDb.session.findFirstOrThrow()).expiresAt).toEqual(
+				before.expiresAt,
+			)
+		})
+
+		it('revokes all sessions and existing access tokens on reuse outside grace', async () => {
+			const original = await login()
+			const other = await login()
+			const alert = vi
 				.spyOn(emailLib, 'sendSecurityAlertEmail')
 				.mockResolvedValue(undefined)
-
-			const user = await authDb.user.create({
-				data: { email: 'reuse@example.com' },
-			})
-
-			const { createRefreshToken, getRefreshTokenExpiry } = await import(
-				'../lib/jwt'
-			)
-			const { token: tokenA, jti: jtiA } = await createRefreshToken({
-				userId: user.id,
-				email: user.email,
-			})
-			await authDb.session.create({
-				data: {
-					userId: user.id,
-					refreshToken: tokenA,
-					jti: jtiA,
-					expiresAt: getRefreshTokenExpiry(),
-				},
-			})
-			// Session B — separat enhet, ska också invalideras när reuse sker.
-			const { token: tokenB, jti: jtiB } = await createRefreshToken({
-				userId: user.id,
-				email: user.email,
-			})
-			await authDb.session.create({
-				data: {
-					userId: user.id,
-					refreshToken: tokenB,
-					jti: jtiB,
-					expiresAt: getRefreshTokenExpiry(),
-				},
-			})
-
-			// Legit rotation av session A
-			const rotated = await authService.refreshAccessToken(tokenA)
-			expect(rotated.success).toBe(true)
-
-			// Skicka tillbaka previousJtiAt utanför grace-fönstret för att
-			// simulera ett angrepp som dyker upp långt efter rotationen.
+			expect(await accessStatus(other.accessToken)).toBe(200)
+			await authService.refreshAccessToken(original.refreshToken)
 			await authDb.session.updateMany({
-				where: { previousJti: jtiA },
-				data: { previousJtiAt: new Date(Date.now() - 60 * 1000) },
+				where: {
+					previousJti: required(await verifyRefreshToken(original.refreshToken))
+						.jti,
+				},
+				data: { previousJtiAt: new Date(Date.now() - 60000) },
 			})
-
-			const reuseAttempt = await authService.refreshAccessToken(tokenA)
-			expect(reuseAttempt.success).toBe(false)
-			expect(alertSpy).toHaveBeenCalledTimes(1)
-
-			const remaining = await authDb.session.findMany({
-				where: { userId: user.id },
-			})
-			expect(remaining).toHaveLength(0)
+			expect(
+				(await authService.refreshAccessToken(original.refreshToken)).success,
+			).toBe(false)
+			expect(await authDb.session.count()).toBe(0)
+			expect(await accessStatus(original.accessToken)).toBe(401)
+			expect(await accessStatus(other.accessToken)).toBe(401)
+			expect(alert).toHaveBeenCalledTimes(1)
 		})
 
-		it('should alert when an unknown jti is presented while other sessions exist', async () => {
-			const alertSpy = vi
+		it('logout immediately denies access and refresh, including a pre-rotation cookie', async () => {
+			const original = await login()
+			const next = await authService.refreshAccessToken(original.refreshToken)
+			await authService.logout(original.refreshToken)
+			expect(await accessStatus(original.accessToken)).toBe(401)
+			expect(await accessStatus(required(next.accessToken))).toBe(401)
+			expect(
+				(await authService.refreshAccessToken(required(next.newRefreshToken)))
+					.success,
+			).toBe(false)
+		})
+
+		it('logoutAll revokes every device while preserving another user', async () => {
+			const a = await login()
+			const b = await login()
+			const other = await login('other-session@example.test')
+			await authService.logoutAll(a.userId)
+			expect(await accessStatus(a.accessToken)).toBe(401)
+			expect(await accessStatus(b.accessToken)).toBe(401)
+			expect(await accessStatus(other.accessToken)).toBe(200)
+		})
+
+		it('does not revoke another device when a logged-out token is replayed', async () => {
+			const a = await login()
+			const b = await login()
+			const alert = vi
 				.spyOn(emailLib, 'sendSecurityAlertEmail')
 				.mockResolvedValue(undefined)
+			await authService.logout(a.refreshToken)
+			expect(
+				(await authService.refreshAccessToken(a.refreshToken)).success,
+			).toBe(false)
+			expect(await accessStatus(b.accessToken)).toBe(200)
+			expect(alert).not.toHaveBeenCalled()
+		})
 
-			const user = await authDb.user.create({
-				data: { email: 'orphan@example.com' },
-			})
-
-			const { createRefreshToken, getRefreshTokenExpiry } = await import(
-				'../lib/jwt'
+		it('rejects a missing, expired or tampered session', async () => {
+			expect((await authService.refreshAccessToken('invalid')).success).toBe(
+				false,
 			)
-			// Aktiv session för användaren.
-			const { token: liveToken, jti: liveJti } = await createRefreshToken({
-				userId: user.id,
-				email: user.email,
+			const a = await login()
+			await authDb.session.updateMany({
+				data: { refreshTokenHash: hashRefreshToken('different') },
 			})
+			expect(
+				(await authService.refreshAccessToken(a.refreshToken)).success,
+			).toBe(false)
+			await authDb.session.updateMany({
+				data: { expiresAt: new Date(Date.now() - 1000) },
+			})
+			expect(await accessStatus(a.accessToken)).toBe(401)
+			expect(
+				(await authService.refreshAccessToken(a.refreshToken)).success,
+			).toBe(false)
+		})
+
+		it('removes legacy plaintext sessions on upgrade but preserves new hashes', async () => {
+			const a = await login()
 			await authDb.session.create({
 				data: {
-					userId: user.id,
-					refreshToken: liveToken,
-					jti: liveJti,
-					expiresAt: getRefreshTokenExpiry(),
-				},
-			})
-
-			// Token med giltig signatur men jti som varken är aktiv eller
-			// previous — t.ex. en stulen token från en session som raderats.
-			const { token: orphan } = await createRefreshToken({
-				userId: user.id,
-				email: user.email,
-			})
-
-			const result = await authService.refreshAccessToken(orphan)
-			expect(result.success).toBe(false)
-			expect(alertSpy).toHaveBeenCalledTimes(1)
-
-			const remaining = await authDb.session.findMany({
-				where: { userId: user.id },
-			})
-			expect(remaining).toHaveLength(0)
-		})
-	})
-
-	describe('logout', () => {
-		it('should delete session', async () => {
-			const user = await authDb.user.create({
-				data: { email: 'test@example.com' },
-			})
-
-			const session = await authDb.session.create({
-				data: {
-					userId: user.id,
-					refreshToken: 'test-refresh-token',
-					jti: 'test-jti-logout',
+					userId: a.userId,
+					refreshTokenHash: 'legacy-plaintext-token',
+					jti: 'legacy-jti',
 					expiresAt: new Date(Date.now() + 86400000),
 				},
 			})
+			await authService.revokeLegacySessions()
+			await authService.revokeLegacySessions()
+			expect(await authDb.session.count()).toBe(1)
+			expect(await accessStatus(a.accessToken)).toBe(200)
+		})
+	})
 
-			await authService.logout('test-refresh-token')
-
-			const deletedSession = await authDb.session.findUnique({
-				where: { id: session.id },
+	describe('OTP concurrency', () => {
+		it('consumes a correct code exactly once when requests race', async () => {
+			const email = 'concurrent-otp@example.test'
+			await authDb.otpCode.create({
+				data: {
+					email,
+					codeHash: hashOtpCode('123456'),
+					expiresAt: getOtpExpiry(),
+				},
 			})
-			expect(deletedSession).toBeNull()
+			const results = await Promise.all(
+				Array.from({ length: 8 }, () => authService.verifyOtp(email, '123456')),
+			)
+			expect(results.filter((r) => r.success)).toHaveLength(1)
+			expect(await authDb.session.count()).toBe(1)
+			expect((await authService.verifyOtp(email, '123456')).success).toBe(false)
+		})
+
+		it('counts concurrent wrong guesses atomically and enforces the attempt limit', async () => {
+			const email = 'concurrent-wrong@example.test'
+			await authDb.otpCode.create({
+				data: {
+					email,
+					codeHash: hashOtpCode('123456'),
+					expiresAt: getOtpExpiry(),
+				},
+			})
+			await Promise.all(
+				Array.from({ length: 8 }, () => authService.verifyOtp(email, '999999')),
+			)
+			expect((await authDb.otpCode.findFirstOrThrow()).attempts).toBe(5)
+			expect((await authService.verifyOtp(email, '123456')).success).toBe(false)
+			expect(await authDb.session.count()).toBe(0)
 		})
 	})
 

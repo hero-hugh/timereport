@@ -1,12 +1,15 @@
+import { randomUUID } from 'node:crypto'
 import { authDb } from '../lib/auth-db'
+import { secureStringEquals } from '../lib/crypto'
 import { sendSecurityAlertEmail } from '../lib/email'
 import {
 	createAccessToken,
 	createRefreshToken,
-	getRefreshTokenExpiry,
+	hashRefreshToken,
 	verifyRefreshToken,
 } from '../lib/jwt'
 import {
+	OTP_CONFIG,
 	generateOtpCode,
 	getOtpExpiry,
 	hasExceededMaxAttempts,
@@ -51,7 +54,8 @@ function clearEmailFailures(email: string): void {
 async function recordEmailFailure(email: string): Promise<void> {
 	const entry = failedByEmail.get(email) ?? { count: 0, lockedUntil: 0 }
 	entry.count += 1
-	if (entry.count >= MAX_EMAIL_FAILURES) {
+	failedByEmail.set(email, entry)
+	if (entry.count === MAX_EMAIL_FAILURES) {
 		entry.lockedUntil = Date.now() + EMAIL_LOCK_MS
 		// Lås → meddela användaren. Bäst-ansträngning, fortsätt oavsett resultat.
 		await sendSecurityAlertEmail(
@@ -59,7 +63,6 @@ async function recordEmailFailure(email: string): Promise<void> {
 			'Någon har försökt logga in på ditt konto med fel kod flera gånger. Inloggningen är tillfälligt pausad i 30 minuter.',
 		).catch(() => undefined)
 	}
-	failedByEmail.set(email, entry)
 }
 
 export class AuthService {
@@ -169,19 +172,32 @@ export class AuthService {
 		const codeMatches = verifyOtpCode(code, otpRecord.codeHash)
 
 		if (!codeMatches) {
-			await authDb.otpCode.update({
-				where: { id: otpRecord.id },
-				data: { attempts: otpRecord.attempts + 1 },
+			await authDb.otpCode.updateMany({
+				where: {
+					id: otpRecord.id,
+					used: false,
+					attempts: { lt: OTP_CONFIG.maxAttempts },
+					expiresAt: { gt: new Date() },
+				},
+				data: { attempts: { increment: 1 } },
 			})
 			await recordEmailFailure(normalizedEmail)
 			return { success: false, error: 'Ogiltig eller utgången kod' }
 		}
 
-		// Markera koden som använd
-		await authDb.otpCode.update({
-			where: { id: otpRecord.id },
+		// Only one request may consume the code, even when verification races.
+		const consumed = await authDb.otpCode.updateMany({
+			where: {
+				id: otpRecord.id,
+				used: false,
+				attempts: { lt: OTP_CONFIG.maxAttempts },
+				expiresAt: { gt: new Date() },
+			},
 			data: { used: true },
 		})
+		if (consumed.count !== 1) {
+			return { success: false, error: 'Ogiltig eller utgången kod' }
+		}
 
 		// Lyckad inloggning — rensa misslyckade försök för denna e-post.
 		clearEmailFailures(normalizedEmail)
@@ -214,18 +230,23 @@ export class AuthService {
 		}
 
 		// Skapa tokens
-		const tokenPayload = { userId: user.id, email: user.email }
+		const sessionId = randomUUID()
+		const tokenPayload = { userId: user.id, email: user.email, sessionId }
 		const accessToken = await createAccessToken(tokenPayload)
-		const { token: refreshToken, jti } = await createRefreshToken(tokenPayload)
+		const {
+			token: refreshToken,
+			jti,
+			expiresAt,
+		} = await createRefreshToken(tokenPayload)
 
-		// Spara refresh token + jti i databas. jti används för reuse detection
-		// vid refresh — se refreshAccessToken nedan.
+		// Persist only the digest; jti identifies rotations for reuse detection.
 		await authDb.session.create({
 			data: {
+				id: sessionId,
 				userId: user.id,
-				refreshToken,
+				refreshTokenHash: hashRefreshToken(refreshToken),
 				jti,
-				expiresAt: getRefreshTokenExpiry(),
+				expiresAt,
 			},
 		})
 
@@ -242,12 +263,13 @@ export class AuthService {
 		}
 	}
 
-	/**
-	 * Förnya access token med refresh token. Implementerar refresh token
-	 * reuse detection (OWASP-rekommendation): om en tidigare-roterad token
-	 * presenteras igen, invalideras ALLA sessioner för användaren och
-	 * en säkerhetsvarning skickas.
-	 */
+	/** Revoke legacy plaintext sessions before accepting requests after upgrade. */
+	async revokeLegacySessions(): Promise<void> {
+		await authDb.session.deleteMany({
+			where: { NOT: { refreshTokenHash: { startsWith: 'sha256:' } } },
+		})
+	}
+
 	async refreshAccessToken(refreshToken: string): Promise<{
 		success: boolean
 		accessToken?: string
@@ -255,104 +277,104 @@ export class AuthService {
 		error?: string
 	}> {
 		const payload = await verifyRefreshToken(refreshToken)
-		if (!payload) {
-			return { success: false, error: 'Ogiltig refresh token' }
-		}
+		if (!payload) return { success: false, error: 'Ogiltig refresh token' }
 
-		// Slå upp session via jti (unikt per refresh token). Om tokenens jti
-		// inte längre finns i DB betyder det att den har roterats bort —
-		// en NY token har ersatt den. Att samma jti presenteras igen är
-		// alltså en reuse av en gammal token.
-		const session = await authDb.session.findUnique({
-			where: { jti: payload.jti },
-			include: { user: true },
-		})
-
-		if (!session) {
-			// Kanske concurrent /refresh — en parallell tabb hann rotera
-			// medan denna förfrågan var in-flight med gamla jti:n. Tolerera
-			// replay av nyligen-roterad token inom REFRESH_GRACE_WINDOW_MS
-			// genom att returnera den nyss utfärdade refresh-tokenen.
-			const racedSession = await authDb.session.findFirst({
-				where: { previousJti: payload.jti },
+		const loadSession = () =>
+			authDb.session.findFirst({
+				where: { id: payload.sessionId, userId: payload.userId },
 				include: { user: true },
 			})
-			if (
-				racedSession?.previousJtiAt &&
-				Date.now() - racedSession.previousJtiAt.getTime() <=
-					REFRESH_GRACE_WINDOW_MS &&
-				new Date() <= racedSession.expiresAt
-			) {
-				const tokenPayload = {
-					userId: racedSession.userId,
-					email: racedSession.user.email,
-				}
-				const newAccessToken = await createAccessToken(tokenPayload)
-				return {
-					success: true,
-					accessToken: newAccessToken,
-					newRefreshToken: racedSession.refreshToken,
-				}
-			}
-
-			// Token-signaturen är giltig (JWT secret har inte läckt), men den
-			// matchar varken aktiv session eller nyligen-roterad. Om användaren
-			// har andra aktiva sessioner är detta en stulen, tidigare-roterad
-			// token — invalidera allt och varna.
-			const otherSessions = await authDb.session.findMany({
-				where: { userId: payload.userId },
-				select: { id: true },
-			})
-			if (otherSessions.length > 0) {
-				await authDb.session.deleteMany({
-					where: { userId: payload.userId },
-				})
-				await sendSecurityAlertEmail(
-					payload.email,
-					'En tidigare-använd inloggnings-session har återanvänts. Det kan tyda på att någon har kopierat din session från en annan enhet.',
-				).catch(() => undefined)
-			}
+		let session = await loadSession()
+		if (!session || session.expiresAt.getTime() <= Date.now()) {
 			return { success: false, error: 'Session hittades inte' }
 		}
 
-		if (new Date() > session.expiresAt) {
-			await authDb.session.delete({ where: { id: session.id } })
-			return { success: false, error: 'Session har gått ut' }
+		const tokenPayload = {
+			userId: session.userId,
+			email: session.user.email,
+			sessionId: session.id,
+		}
+		const presentedHash = hashRefreshToken(refreshToken)
+		const inGrace = () =>
+			session?.previousJtiAt !== null &&
+			session?.previousJtiAt !== undefined &&
+			Date.now() - session.previousJtiAt.getTime() <= REFRESH_GRACE_WINDOW_MS
+
+		if (session.jti === payload.jti) {
+			if (!secureStringEquals(session.refreshTokenHash, presentedHash)) {
+				return { success: false, error: 'Ogiltig refresh token' }
+			}
+			// Keep the winner stable while concurrent tabs receive its cookie.
+			if (!inGrace()) {
+				const next = await createRefreshToken(tokenPayload)
+				const rotated = await authDb.session.updateMany({
+					where: {
+						id: session.id,
+						jti: payload.jti,
+						refreshTokenHash: presentedHash,
+						expiresAt: { gt: new Date() },
+					},
+					data: {
+						refreshTokenHash: hashRefreshToken(next.token),
+						jti: next.jti,
+						previousJti: payload.jti,
+						previousJtiAt: new Date(),
+						expiresAt: next.expiresAt,
+					},
+				})
+				if (rotated.count === 1) {
+					return {
+						success: true,
+						accessToken: await createAccessToken(tokenPayload),
+						newRefreshToken: next.token,
+					}
+				}
+				// A competing request rotated or revoked the session first.
+				session = await loadSession()
+				if (!session || session.expiresAt.getTime() <= Date.now()) {
+					return { success: false, error: 'Session hittades inte' }
+				}
+			}
 		}
 
-		// Refresh token rotation — skapa nya tokens och uppdatera session
-		// atomärt. Att uppdatera jti samtidigt som refreshToken stänger ute
-		// den gamla tokenen omedelbart. previousJti + previousJtiAt sparas
-		// så att en parallell concurrent refresh kan accepteras inom grace.
-		const tokenPayload = { userId: session.userId, email: session.user.email }
-		const newAccessToken = await createAccessToken(tokenPayload)
-		const { token: newRefreshToken, jti: newJti } =
-			await createRefreshToken(tokenPayload)
-
-		await authDb.session.update({
-			where: { id: session.id },
-			data: {
-				refreshToken: newRefreshToken,
-				jti: newJti,
-				previousJti: session.jti,
-				previousJtiAt: new Date(),
-				expiresAt: getRefreshTokenExpiry(),
-			},
-		})
-
-		return {
-			success: true,
-			accessToken: newAccessToken,
-			newRefreshToken,
+		if (
+			inGrace() &&
+			(session.jti === payload.jti || session.previousJti === payload.jti)
+		) {
+			const current = await createRefreshToken(tokenPayload, {
+				jti: session.jti,
+				expiresAt: session.expiresAt,
+			})
+			if (
+				!secureStringEquals(
+					hashRefreshToken(current.token),
+					session.refreshTokenHash,
+				)
+			) {
+				return { success: false, error: 'Ogiltig refresh token' }
+			}
+			return {
+				success: true,
+				accessToken: await createAccessToken(tokenPayload),
+				newRefreshToken: current.token,
+			}
 		}
+
+		// A signed stale token for an existing session indicates reuse.
+		await this.logoutAll(payload.userId)
+		await sendSecurityAlertEmail(
+			payload.email,
+			'En tidigare använd inloggningssession har återanvänts. Alla sessioner har avslutats. Logga in igen.',
+		).catch(() => undefined)
+		return { success: false, error: 'Session hittades inte' }
 	}
 
-	/**
-	 * Logga ut - ta bort session
-	 */
 	async logout(refreshToken: string): Promise<void> {
+		const payload = await verifyRefreshToken(refreshToken)
+		if (!payload) return
+		// The stable session ID also handles logout racing with rotation.
 		await authDb.session.deleteMany({
-			where: { refreshToken },
+			where: { id: payload.sessionId, userId: payload.userId },
 		})
 	}
 

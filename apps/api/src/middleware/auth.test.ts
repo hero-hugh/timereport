@@ -1,6 +1,7 @@
 import { Hono } from 'hono'
 import { describe, expect, it, vi } from 'vitest'
 import type { UserPrismaClient } from '../lib/user-db'
+import { createTestSession } from '../test/session'
 import { getAuthUser, getAuthUserDb, requireAuth } from './auth'
 
 vi.mock('../lib/jwt', () => ({
@@ -37,11 +38,37 @@ describe('Auth Middleware', () => {
 			expect(res.status).toBe(401)
 		})
 
+		it('rejects a session belonging to a different user before opening a user database', async () => {
+			const { verifyAccessToken } = await import('../lib/jwt')
+			const { getUserDb } = await import('../lib/user-db')
+			vi.mocked(getUserDb).mockClear()
+			const session = await createTestSession('session-owner')
+			vi.mocked(verifyAccessToken).mockResolvedValueOnce({
+				userId: 'other-user',
+				email: 'other@example.test',
+				sessionId: session.id,
+			})
+			const app = new Hono().get('/', requireAuth, (c) => c.json({ ok: true }))
+			expect(
+				(
+					await app.request('/', {
+						headers: { Authorization: 'Bearer signed-token' },
+					})
+				).status,
+			).toBe(401)
+			expect(getUserDb).not.toHaveBeenCalled()
+		})
+
 		it('should set user and userDb on context for valid token', async () => {
 			const { verifyAccessToken } = await import('../lib/jwt')
 			const { getUserDb } = await import('../lib/user-db')
 
-			const mockPayload = { userId: 'user-123', email: 'test@example.com' }
+			const session = await createTestSession('user-123')
+			const mockPayload = {
+				userId: 'user-123',
+				email: 'test@example.com',
+				sessionId: session.id,
+			}
 			const mockUserDb = {
 				project: {},
 				timeEntry: {},
@@ -75,7 +102,12 @@ describe('Auth Middleware', () => {
 			const { verifyAccessToken } = await import('../lib/jwt')
 			const { getUserDb } = await import('../lib/user-db')
 
-			const mockPayload = { userId: 'user-456', email: 'test@example.com' }
+			const session = await createTestSession('user-456')
+			const mockPayload = {
+				userId: 'user-456',
+				email: 'test@example.com',
+				sessionId: session.id,
+			}
 			const mockUserDb = { project: {} } as unknown as UserPrismaClient
 
 			vi.mocked(verifyAccessToken).mockResolvedValueOnce(mockPayload)
@@ -96,7 +128,12 @@ describe('Auth Middleware', () => {
 			const { verifyAccessToken } = await import('../lib/jwt')
 			const { getUserDb } = await import('../lib/user-db')
 
-			const mockPayload = { userId: 'user-789', email: 'test@example.com' }
+			const session = await createTestSession('user-789')
+			const mockPayload = {
+				userId: 'user-789',
+				email: 'test@example.com',
+				sessionId: session.id,
+			}
 			vi.mocked(verifyAccessToken).mockResolvedValueOnce(mockPayload)
 			vi.mocked(getUserDb).mockReturnValueOnce(
 				{} as unknown as UserPrismaClient,

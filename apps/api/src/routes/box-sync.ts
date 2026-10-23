@@ -10,25 +10,20 @@ import {
 	updateTimeReport,
 } from '../lib/box-client'
 import { minutesToHHMM } from '../lib/box-mapper'
-import {
-	decryptSecret,
-	encryptSecret,
-	isEncryptedSecret,
-} from '../lib/crypto'
+import { decryptSecret, encryptSecret, isEncryptedSecret } from '../lib/crypto'
 import { getAuthUser, getAuthUserDb, requireAuth } from '../middleware/auth'
 
 function mapBoxErrorToUserMessage(error: BoxApiError): string {
-	const msg = error.message
-	if (msg.startsWith('Network error:')) {
-		return 'Nätverksfel - försök igen'
+	switch (error.category) {
+		case 'network':
+			return 'Nätverksfel - försök igen'
+		case 'authentication':
+			return 'BOX API token ogiltigt - kontrollera token i API inställningar'
+		case 'hours':
+			return 'Ett fel uppstod med tidsformatet'
+		default:
+			return 'Kunde inte skicka till BOX - försök igen senare'
 	}
-	if (msg.includes('401') || msg.includes('403')) {
-		return 'BOX API token ogiltigt - kontrollera token i API inställningar'
-	}
-	if (msg.includes('hours') || msg.includes('Hours')) {
-		return 'Ett fel uppstod med tidsformatet'
-	}
-	return msg || 'Kunde inte skicka till BOX'
 }
 
 const boxSync = new Hono()
@@ -93,8 +88,8 @@ boxSync.post('/sync', async (c) => {
 	if (isEncryptedSecret(dbUser.boxApiToken)) {
 		try {
 			token = decryptSecret(dbUser.boxApiToken)
-		} catch (err) {
-			console.error('[BOX-SYNC] Failed to decrypt token', err)
+		} catch {
+			console.error('[BOX-SYNC] Failed to decrypt token')
 			return c.json(
 				{
 					success: false,
@@ -113,9 +108,9 @@ boxSync.post('/sync', async (c) => {
 				where: { id: userId },
 				data: { boxApiToken: encryptSecret(token) },
 			})
-		} catch (err) {
+		} catch {
 			// Don't fail the sync; migration can retry on next call.
-			console.error('[BOX-SYNC] Failed to migrate legacy token', err)
+			console.error('[BOX-SYNC] Failed to migrate legacy token')
 		}
 	}
 
@@ -162,7 +157,7 @@ boxSync.post('/sync', async (c) => {
 		boxReports = await getTimeReports(token, year, month)
 	} catch (error) {
 		if (error instanceof BoxApiError) {
-			console.error('BOX API error fetching time reports:', error.message)
+			console.error('BOX API error fetching time reports:', error.category)
 			return c.json(
 				{ success: false, error: mapBoxErrorToUserMessage(error) },
 				502,
@@ -189,7 +184,7 @@ boxSync.post('/sync', async (c) => {
 		fullReport = await getSingleTimeReport(token, boxReport.id)
 	} catch (error) {
 		if (error instanceof BoxApiError) {
-			console.error('BOX API error fetching single report:', error.message)
+			console.error('BOX API error fetching single report:', error.category)
 			return c.json(
 				{ success: false, error: mapBoxErrorToUserMessage(error) },
 				502,
@@ -239,7 +234,7 @@ boxSync.post('/sync', async (c) => {
 		await updateTimeReport(token, boxReport.id, updatedEntries)
 	} catch (error) {
 		if (error instanceof BoxApiError) {
-			console.error('BOX API error updating time report:', error.message)
+			console.error('BOX API error updating time report:', error.category)
 			return c.json(
 				{ success: false, error: mapBoxErrorToUserMessage(error) },
 				502,

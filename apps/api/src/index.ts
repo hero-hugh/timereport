@@ -16,6 +16,7 @@ import projects from './routes/projects'
 import reports from './routes/reports'
 import timeEntries from './routes/time-entries'
 import user from './routes/user'
+import { authService } from './services/auth.service'
 
 // Startup-säkerhetsassertions — misconfig ska inte gå att missa i prod.
 // NODE_ENV måste vara exakt ett känt värde; annars baila ut. Detta skyddar
@@ -193,6 +194,9 @@ app.onError((err, c) => {
 		500,
 	)
 })
+
+// Fail closed if the legacy-session cleanup cannot complete.
+await authService.revokeLegacySessions()
 
 const port = Number(process.env.PORT) || 3000
 
