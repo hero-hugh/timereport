@@ -291,6 +291,18 @@ Node-patchen åtgärdar bland annat Brotli RCE, CVE-2026-111497. Node 20 är EOL
 - [x] Playwright startar API och frontend separat, sätter API:ts testmiljö explicit och väntar på både `/api/health` och frontend. Befintliga servrar återanvänds inte i CI.
 - [x] Alla 5 E2E-tester passerar lokalt på Node 22.23.4 i en separat checkout med isolerade testdatabaser och CI:s miljöfil.
 
+### Åtgärder efter säkerhetsaudit 2026-10-23
+- [x] A1: Rekursiva Docker-undantag och begränsad kopiering av API-källkod/schemas. CI bygger och inspekterar både byggimages och produktionsimages med syntetiska hemlighets-/databasfiler som ska filtreras bort.
+- [x] A2: Refresh-token lagras enbart som SHA-256-digest. Äldre klartextsessioner återkallas vid uppstart; Prisma behåller den befintliga fysiska kolumnen via `@map`.
+- [x] A3: Sessionsbundna JWT och kontroll av aktiv session vid varje skyddat anrop. Ny autentiserad endpoint för utloggning från alla enheter.
+- [x] A4: Atomär OTP-förbrukning, försöksräknare och refresh-rotation. Ett gemensamt refresh-resultat för parallella anrop under 30 sekunders grace, utan beständig klartextlagring.
+- [x] A5: BOX-fel maskeras till fasta felkategorier och svenska meddelanden. Råa upstream-fel loggas inte av BOX-klienten/routes.
+- [x] A6: Entrypoint stoppar vid volym-/behörighetsfel och kör API:t som UID 1001. Nya databasfiler får privata behörigheter. Verifieras även i CI.
+- [x] Verifierat 206 backendtester, 83 frontendtester, 5 E2E-tester, TypeScript/produktionsbyggen, Biome på ändrade TypeScript-filer samt Docker-filtrering och verklig containerstart. Full lint har 22 befintliga fel utanför ändringen.
+- [x] Ursprungliga fynd bevarade med uppdaterad åtgärdsstatus och driftsättningsinformation i `docs/SECURITY_AUDIT.md`.
+- [ ] Driftsätt fixarna och verifiera i produktion. Första uppgraderingen kräver ny inloggning för befintliga användare.
+- [ ] Inventera äldre publicerade images, byggcache och backuper; rotera eventuellt exponerade nycklar. Driftens nätverk, proxyförtroende och behörigheter är fortsatt ej verifierade.
+
 ---
 
 ## Miljövariabler

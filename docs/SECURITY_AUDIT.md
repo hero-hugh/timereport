@@ -2,9 +2,32 @@
 
 Granskad 2026-10-23 mot commit `0cb1703`. Fokus: dataläckage, nycklar, sessionssäkerhet, åtkomst mellan användare och åtkomst till interna system.
 
-Detta är en granskning med lokala verifieringar, inte ett intyg om produktionsmiljön. Inga produktionsanrop, riktiga inloggningar eller BOX-anrop har utförts. Applikationskoden har inte ändrats. Den tidigare rapportens fynd har omprövats mot aktuell kod; flera av dem är redan åtgärdade.
+Detta är en granskning med lokala verifieringar, inte ett intyg om produktionsmiljön. Inga produktionsanrop, riktiga inloggningar eller BOX-anrop har utförts. Ursprungliga fynd och verifieringar finns kvar nedan; efterföljande kodåtgärder redovisas separat här.
 
-## Bedömning
+## Åtgärdsstatus 2026-10-23
+
+Kodfixar för A1–A6 har implementerats ovanpå `c314a7e` och verifierats lokalt. De är ännu inte verifierade i produktionsmiljön.
+
+| ID | Implementerad ändring | Regressionstest |
+|---|---|---|
+| A1 | Rekursiva Docker-undantag för miljöfiler, databaser, nyckelfiler, data och byggartefakter. API-bygget kopierar specificerade källfiler/schemas och genererar alla Prisma-klienter. | Båda byggimages och båda produktionsimages byggda med syntetiska `.env.local`, `auth.db`, `auth.db-wal` och `private.key` i undermappar; inga förbjudna applikationsfiler hittades. Samma kontroll tillagd i CI. |
+| A2 | Endast SHA-256-digest av refresh-token lagras. Grace-flödet återskapar vinnande token med signerarnyckeln, sessionens ID, jti och fasta giltighetstid. Äldre klartextsessioner raderas före serverstart. | Inloggning och rotation lagrar digest; parallella anrop återfår samma token utan klartextlagring. Uppgraderingsrensningen är idempotent och bevarar nya sessioner. |
+| A3 | JWT innehåller sessions-ID. Middleware kräver en existerande, giltig session för samma användare. Ny autentiserad `POST /api/auth/logout-all`. | Logout, logout-all och upptäckt token-reuse ger 401 med tidigare access-token. Andra användare behåller åtkomst. Sessions-ID från en annan användare nekas. |
+| A4 | OTP konsumeras villkorat och atomärt; felräknaren ökas atomärt. Refresh-rotation använder villkorad uppdatering av aktuell jti och digest. | Åtta parallella korrekta OTP-anrop ger en session. Parallella felgissningar når försöksgränsen. Åtta refresh-anrop får en gemensam ny token; återanvändning utanför grace återkallar sessionerna. |
+| A5 | BOX-klienten kastar fasta felkategorier och behåller inte råa upstream-meddelanden, svarskroppar eller nätverksfel. Routes returnerar svenska standardmeddelanden och loggar kategorier. | Syntetisk hemlighet/intern adress i GraphQL-fel når varken API-svar eller route-logg. HTTP-, nätverks- och JSON-fel maskeras. |
+| A6 | Entrypoint avbryter vid ägarskapsfel, misslyckad behörighetssänkning eller icke skrivbar datakatalog. `umask 077` skyddar nya databasfiler. | Riktig containerstart ger frisk health-route, Node som UID 1001 och auth.db med behörighet 600. Skrivskyddad katalog och blockerad setuid avbryter före Prisma/Node. Samma kontroll tillagd i CI. |
+
+Verifiering: 206 backendtester och 83 frontendtester passerar, liksom alla 5 E2E-tester i en separat kopia med testdatabaser. TypeScript och produktionsbyggen passerar. Ändrade TypeScript-filer passerar Biome. Projektets fulla lint har fortfarande 22 befintliga fel utanför ändringen.
+
+### Vid driftsättning
+
+- **Användare behöver logga in igen vid första uppgraderingen.** Gamla token saknar sessionsbindning och godtas inte; äldre klartextsessioner tas bort före API:t börjar ta emot anrop. Användare, projekt, tider och BOX-inställningar påverkas inte av denna rensning.
+- Prisma-fältet heter nu `refreshTokenHash` men använder `@map("refreshToken")`. Den fysiska kolumnen och dess index behålls; ingen destruktiv schemaändring behövs. Generera klienterna med `npm run db:generate:all`. Kör inte gammal och ny API-version parallellt mot samma auth-databas.
+- Bygg och driftsätt nya images. Bekräfta health, faktisk process-UID och inloggning/utloggning i drift. Detta har bara verifierats lokalt med syntetiska testdata.
+- Inventera tidigare publicerade images, byggcache och backuper. Nya Docker-undantag rensar inte gamla kopior, och radborttagning garanterar inte fysisk radering ur SQLite-filer eller backuper. Återkalla/rotera berörda sessioner och nycklar om känsligt material har publicerats. Inga sådana externa raderingar eller rotationer har utförts här.
+- Kontrollerna av image-filsystemet avser applikationskataloger och utesluter `node_modules`. De ersätter inte en secretscanner för godtyckliga filnamn, lagerhistorik eller en sårbarhetsskanning av OS-paket. Rapporterade driftosäkerheter och övriga förstärkningar nedan, inklusive OTP-hashens lilla sökutrymme, kvarstår.
+
+## Ursprunglig bedömning
 
 Prioritera Docker-byggkontexten och sessionslagringen. Den lokalt byggda backend-imagen innehåller databasfiler. Refresh-token lagras samtidigt som direkt återanvändbara bearer-token i auth-databasen. Kombinationen kan göra en image- eller backup-läcka till kontoövertagande om giltiga produktionssessioner finns i materialet.
 
@@ -129,4 +152,4 @@ Sessionsåtgärderna följer principen om serverstyrd återkallelse och skydd av
 4. Maskera BOX-fel och avbryt starten om servern inte kan köras oprivilegierat.
 5. Fastställ registreringspolicy och verifiera driftens proxyförtroende, nätverksisolering, registry-/backupåtkomst och deploybehörigheter.
 
-Verifieringsskriptet kördes med syntetiska användare och separata temporära databaser; inga produktionshemligheter har skrivits i rapporten. Applikationens säkerhetsbrister är rapporterade, inte åtgärdade av denna audit.
+Det ursprungliga verifieringsskriptet kördes med syntetiska användare och separata temporära databaser; inga produktionshemligheter har skrivits i rapporten. Åtgärder efter audit-tillfället och deras verifiering redovisas i åtgärdsstatusen ovan.
