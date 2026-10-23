@@ -8,6 +8,7 @@ export default defineConfig(({ mode }) => {
 	Object.assign(process.env, loadEnv(mode, __dirname, ''))
 
 	return {
+		root: __dirname,
 		test: {
 			globals: true,
 			environment: 'node',
@@ -15,11 +16,8 @@ export default defineConfig(({ mode }) => {
 			setupFiles: ['./src/test/setup.ts'],
 			// Kör tester sekventiellt för att undvika databaskonflikter
 			pool: 'forks',
-			poolOptions: {
-				forks: {
-					singleFork: true,
-				},
-			},
+			maxWorkers: 1,
+			fileParallelism: false,
 			testTimeout: 10000,
 		},
 	}

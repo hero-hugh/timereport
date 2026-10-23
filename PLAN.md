@@ -274,6 +274,18 @@ Query params: `?projectId=&from=&to=`
 - [x] API för svenska helgdagar (35 tester)
 - [x] Skriva tester för frontend (84 tester passerar)
 
+### Säkerhetsuppdatering 2026-10-23
+- [x] Ersatt Node 20 med Node 22.23.4 i båda Dockerfilerna och CI/deploy. Lokal version väljs med `.nvmrc`; `engines` kräver minst 22.23.4 inom Node 22.
+- [x] Installerat Node 22.23.4 lokalt via nvm och verifierat versionen i den byggda backend-containern.
+- [x] Uppdaterat npm-lockfilens kompatibla säkerhetsfixar samt Vite till 6.4.5, Vitest till 4.1.12 och React Router till 7.18.4. Anpassat testkonfiguration och mockar till Vitest 4; lagt till saknad testuppgift i Turbo.
+- [x] `npm audit --omit=dev`: 0 sårbarheter. Full `npm audit`: minskat från 28 (2 kritiska) till 8 (0 kritiska, 5 höga, 3 måttliga).
+- [x] Verifierat ren `npm ci`, 270 tester (187 backend + 83 frontend), TypeScript/produktionsbygge och båda Dockerbyggena på Node 22.23.4.
+- [ ] Åtgärda återstående byggberoenden: `braces`/`chokidar`/`micromatch`/`fast-glob` samt `postcss-selector-parser`/`postcss-nested` via Tailwind 3 och `tailwindcss-animate`. npm rapporterar ingen komplett tillgänglig fix; en separat Tailwind-migrering behöver utvärderas. Dessa paket ingår inte i produktionsberoendena enligt `npm audit --omit=dev`.
+- [ ] Befintliga lintfel utanför säkerhetsändringen kvarstår. Ändrade kod- och konfigurationsfiler kontrolleras separat med Biome.
+- [ ] Bygg om och driftsätt de uppdaterade bilderna; verifiera `node --version` i den körande backend-containern. Produktionsmiljön har inte ändrats eller inspekterats i denna kontroll.
+
+Node-patchen åtgärdar bland annat Brotli RCE, CVE-2026-111497. Node 20 är EOL och får inte motsvarande säkerhetspatch. Se [Node.js säkerhetsrelease 2026-10-21](https://nodejs.org/en/blog/vulnerability/october-2026-security-releases) och [release 22.23.4](https://nodejs.org/en/blog/release/v22.23.4/). `npm audit` kontrollerar npm-beroenden, inte själva Node-runtime eller operativsystemets paket. Versionspinnarna behöver uppdateras vid kommande säkerhetsreleaser.
+
 ---
 
 ## Miljövariabler
@@ -296,8 +308,12 @@ VITE_API_URL="http://localhost:3000"
 ## Kommandon
 
 ```bash
+# Välj projektets patchade Node-version
+nvm install
+nvm use
+
 # Installera dependencies
-npm install
+npm ci
 
 # Starta utvecklingsservrar
 npm run dev:api          # Backend på port 3000

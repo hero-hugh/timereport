@@ -42,7 +42,7 @@ describe('User routes - BOX token', () => {
 
 	beforeEach(() => {
 		app = createApp()
-		vi.restoreAllMocks()
+		vi.resetAllMocks()
 	})
 
 	describe('GET /api/user/box-token', () => {

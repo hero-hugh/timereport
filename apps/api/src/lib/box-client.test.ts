@@ -10,11 +10,12 @@ import {
 const fetchMock = vi.fn()
 
 beforeEach(() => {
+	fetchMock.mockReset()
 	vi.stubGlobal('fetch', fetchMock)
 })
 
 afterEach(() => {
-	vi.restoreAllMocks()
+	vi.unstubAllGlobals()
 })
 
 function mockFetchResponse(body: unknown, status = 200) {
