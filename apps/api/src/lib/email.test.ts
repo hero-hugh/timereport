@@ -3,9 +3,9 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 const sendMock = vi.fn()
 
 vi.mock('resend', () => ({
-	Resend: vi.fn().mockImplementation(() => ({
-		emails: { send: sendMock },
-	})),
+	Resend: class {
+		emails = { send: sendMock }
+	},
 }))
 
 import { buildOtpHtml, sendLoginCodeEmail } from './email'

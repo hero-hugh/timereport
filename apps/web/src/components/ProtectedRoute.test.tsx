@@ -65,7 +65,7 @@ describe('ProtectedRoute', () => {
 		expect(screen.queryByText('Login Page')).not.toBeInTheDocument()
 	})
 
-	it('should show loading indicator with clock emoji', () => {
+	it('should hide protected content while loading', () => {
 		mockUseAuth.mockReturnValue({
 			isAuthenticated: false,
 			isLoading: true,
@@ -73,7 +73,7 @@ describe('ProtectedRoute', () => {
 
 		renderWithRouter(<div>Protected Content</div>)
 
-		// Check for the clock emoji in the loading state
-		expect(document.body.textContent).toContain('\u23F1') // Timer clock
+		expect(screen.getByText('Laddar...')).toBeInTheDocument()
+		expect(screen.queryByText('Protected Content')).not.toBeInTheDocument()
 	})
 })

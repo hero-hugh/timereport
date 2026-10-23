@@ -37,7 +37,7 @@ describe('GET /api/reports/pdf', () => {
 
 	beforeEach(() => {
 		app = createApp()
-		vi.restoreAllMocks()
+		vi.resetAllMocks()
 	})
 
 	describe('authentication', () => {

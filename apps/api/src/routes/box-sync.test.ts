@@ -103,7 +103,7 @@ describe('POST /api/box/sync', () => {
 
 	beforeEach(() => {
 		app = createApp()
-		vi.restoreAllMocks()
+		vi.resetAllMocks()
 	})
 
 	it('returns 401 when not authenticated', async () => {
@@ -256,8 +256,7 @@ describe('POST /api/box/sync', () => {
 
 		// Verify updateTimeReport was called with correct mapped entries
 		expect(vi.mocked(updateTimeReport)).toHaveBeenCalledOnce()
-		const [token, reportId, entries] =
-			vi.mocked(updateTimeReport).mock.calls[0]
+		const [token, reportId, entries] = vi.mocked(updateTimeReport).mock.calls[0]
 		expect(token).toBe('box-api-token-123')
 		expect(reportId).toBe('box-report-1')
 

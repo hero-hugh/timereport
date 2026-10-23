@@ -20,7 +20,7 @@ jobs:
       - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version-file: .nvmrc
           cache: npm
 
       - name: Install dependencies
@@ -29,6 +29,10 @@ jobs:
 
       - name: Generate Prisma clients
         run: npm run db:generate:all
+
+      - name: Audit production dependencies
+        run: npm audit --audit-level=high --omit=dev
+        working-directory: .
 
       - name: Run tests
         run: npm test
@@ -54,6 +58,7 @@ jobs:
         with:
           context: .
           file: ./Dockerfile.api
+          pull: true
           push: true
           tags: |
             ${{ env.IMAGE_PREFIX }}/backend:latest
@@ -64,6 +69,7 @@ jobs:
         with:
           context: .
           file: ./Dockerfile.web
+          pull: true
           push: true
           build-args: |
             VITE_API_URL=https://timereport-backend.app.svens.tech
