@@ -16,10 +16,21 @@ export default defineConfig({
 			use: { browserName: 'chromium' },
 		},
 	],
-	webServer: {
-		command: 'E2E_TEST_OTP=000000 npm run dev',
-		url: 'http://localhost:5173',
-		reuseExistingServer: true,
-		timeout: 120_000,
-	},
+	// Start each server directly so Turbo cannot filter the API's test environment.
+	webServer: [
+		{
+			command: 'npm run dev:api',
+			url: 'http://localhost:3000/api/health',
+			env: { NODE_ENV: 'test', E2E_TEST_OTP: '000000' },
+			reuseExistingServer: !process.env.CI,
+			timeout: 120_000,
+		},
+		{
+			command: 'npm run dev:web',
+			url: 'http://localhost:5173',
+			env: { VITE_API_URL: 'http://localhost:3000' },
+			reuseExistingServer: !process.env.CI,
+			timeout: 120_000,
+		},
+	],
 })

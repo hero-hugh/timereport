@@ -286,6 +286,11 @@ Query params: `?projectId=&from=&to=`
 
 Node-patchen åtgärdar bland annat Brotli RCE, CVE-2026-111497. Node 20 är EOL och får inte motsvarande säkerhetspatch. Se [Node.js säkerhetsrelease 2026-10-21](https://nodejs.org/en/blog/vulnerability/october-2026-security-releases) och [release 22.23.4](https://nodejs.org/en/blog/release/v22.23.4/). `npm audit` kontrollerar npm-beroenden, inte själva Node-runtime eller operativsystemets paket. Versionspinnarna behöver uppdateras vid kommande säkerhetsreleaser.
 
+### CI: E2E-uppstart 2026-10-23
+- [x] Reproducerat inloggningstimeout från CI-jobb `120299693675`: Turbo filtrerade bort `NODE_ENV`, vilket fick API:ts startup-kontroll att avbryta medan frontend fortfarande startade.
+- [x] Playwright startar API och frontend separat, sätter API:ts testmiljö explicit och väntar på både `/api/health` och frontend. Befintliga servrar återanvänds inte i CI.
+- [x] Alla 5 E2E-tester passerar lokalt på Node 22.23.4 i en separat checkout med isolerade testdatabaser och CI:s miljöfil.
+
 ---
 
 ## Miljövariabler
