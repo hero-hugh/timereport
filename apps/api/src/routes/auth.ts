@@ -169,4 +169,11 @@ auth.get('/me', requireAuth, async (c) => {
 	return c.json({ success: true, data: user })
 })
 
+auth.post('/logout-all', requireAuth, async (c) => {
+	await authService.logoutAll(getAuthUser(c).userId)
+	deleteCookie(c, 'access_token', JWT_CONFIG.cookieOptions)
+	deleteCookie(c, 'refresh_token', JWT_CONFIG.cookieOptions)
+	return c.json({ success: true, message: 'Utloggad från alla enheter' })
+})
+
 export default auth

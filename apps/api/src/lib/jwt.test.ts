@@ -1,3 +1,4 @@
+import { SignJWT } from 'jose'
 import { describe, expect, it } from 'vitest'
 import {
 	createAccessToken,
@@ -10,6 +11,7 @@ import {
 describe('JWT utilities', () => {
 	const testPayload = {
 		userId: 'test-user-id',
+		sessionId: 'test-session-id',
 		email: 'test@example.com',
 	}
 
@@ -42,6 +44,15 @@ describe('JWT utilities', () => {
 			const a = await createRefreshToken(testPayload)
 			const b = await createRefreshToken(testPayload)
 			expect(a.jti).not.toBe(b.jti)
+		})
+
+		it('reconstructs the same refresh token without storing the bearer token', async () => {
+			const first = await createRefreshToken(testPayload)
+			const reconstructed = await createRefreshToken(testPayload, {
+				jti: first.jti,
+				expiresAt: first.expiresAt,
+			})
+			expect(reconstructed.token).toBe(first.token)
 		})
 	})
 
@@ -97,5 +108,32 @@ describe('JWT utilities', () => {
 			// Allow 1 second tolerance
 			expect(Math.abs(expiry.getTime() - expectedExpiry)).toBeLessThan(1000)
 		})
+	})
+
+	it.each(['access', 'refresh'])(
+		'rejects legacy %s tokens without a session binding',
+		async (kind) => {
+			const secret =
+				kind === 'access'
+					? process.env.JWT_SECRET
+					: process.env.JWT_REFRESH_SECRET
+			const token = await new SignJWT({
+				userId: testPayload.userId,
+				email: testPayload.email,
+			})
+				.setProtectedHeader({ alg: 'HS256' })
+				.setJti('legacy-jti')
+				.setExpirationTime('15m')
+				.sign(new TextEncoder().encode(secret))
+			const verify = kind === 'access' ? verifyAccessToken : verifyRefreshToken
+			expect(await verify(token)).toBeNull()
+		},
+	)
+
+	it('rejects signed tokens without an expiry', async () => {
+		const token = await new SignJWT({ ...testPayload })
+			.setProtectedHeader({ alg: 'HS256' })
+			.sign(new TextEncoder().encode(process.env.JWT_SECRET))
+		expect(await verifyAccessToken(token)).toBeNull()
 	})
 })

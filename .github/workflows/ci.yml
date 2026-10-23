@@ -95,3 +95,34 @@ jobs:
           name: playwright-report
           path: test-results/
           retention-days: 7
+
+  image-security:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Seed synthetic files to verify recursive exclusions
+        run: |
+          for directory in apps/api/src/security-canary apps/web/public/security-canary; do
+            mkdir -p "$directory"
+            for file in .env.local auth.db auth.db-wal private.key; do
+              printf '%s\n' 'synthetic-security-canary' > "$directory/$file"
+            done
+          done
+
+      - name: Build application images
+        run: |
+          docker build --pull --target builder -f Dockerfile.api -t time-report-api-builder:ci .
+          docker build --pull --target builder -f Dockerfile.web -t time-report-web-builder:ci .
+          docker build --pull -f Dockerfile.api -t time-report-api:ci .
+          docker build --pull -f Dockerfile.web -t time-report-web:ci .
+
+      - name: Reject embedded databases and secrets
+        run: |
+          sh docker/check-image.sh time-report-api-builder:ci
+          sh docker/check-image.sh time-report-web-builder:ci
+          sh docker/check-image.sh time-report-api:ci
+          sh docker/check-image.sh time-report-web:ci
+
+      - name: Verify unprivileged API startup
+        run: sh docker/check-runtime.sh time-report-api:ci

@@ -2,6 +2,7 @@ import { Hono } from 'hono'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { authDb } from '../lib/auth-db'
 import { decryptSecret, encryptSecret } from '../lib/crypto'
+import { createTestSession } from '../test/session'
 
 vi.mock('../lib/jwt', () => ({
 	verifyAccessToken: vi.fn(),
@@ -24,7 +25,9 @@ async function authenticateRequest(userId = 'test-user-id') {
 	const { verifyAccessToken } = await import('../lib/jwt')
 	const { getUserDb } = await import('../lib/user-db')
 
+	const session = await createTestSession(userId)
 	vi.mocked(verifyAccessToken).mockResolvedValueOnce({
+		sessionId: session.id,
 		userId,
 		email: 'test@example.com',
 	})

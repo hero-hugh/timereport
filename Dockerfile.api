@@ -10,13 +10,17 @@ COPY packages/shared/package.json ./packages/shared/
 
 RUN npm ci
 
-COPY apps/api/ ./apps/api/
+COPY apps/api/src/ ./apps/api/src/
+COPY apps/api/tsconfig.json ./apps/api/
+COPY apps/api/prisma/schema.prisma ./apps/api/prisma/
+COPY apps/api/prisma/central/schema.prisma ./apps/api/prisma/central/
+COPY apps/api/prisma/central/migrations/ ./apps/api/prisma/central/migrations/
+COPY apps/api/prisma/user/schema.prisma ./apps/api/prisma/user/
 COPY packages/shared/ ./packages/shared/
 COPY tsconfig.json ./
 
-# Generate Prisma clients for both schemas (auth + per-user)
-RUN npx prisma generate --schema=apps/api/prisma/central/schema.prisma
-RUN npx prisma generate --schema=apps/api/prisma/user/schema.prisma
+# Generate all clients from the schemas; never copy local generated files.
+RUN npm run db:generate:all --workspace=@time-report/api
 
 RUN npm run build --workspace=@time-report/shared
 RUN npm run build --workspace=@time-report/api
@@ -50,7 +54,9 @@ RUN npm ci
 RUN npm install --no-save prisma@5
 
 COPY --from=builder /app/apps/api/dist/ ./apps/api/dist/
-COPY --from=builder /app/apps/api/prisma/ ./apps/api/prisma/
+COPY --from=builder /app/apps/api/prisma/central/schema.prisma ./apps/api/prisma/central/
+COPY --from=builder /app/apps/api/prisma/central/migrations/ ./apps/api/prisma/central/migrations/
+COPY --from=builder /app/apps/api/prisma/user/schema.prisma ./apps/api/prisma/user/
 COPY --from=builder /app/packages/shared/dist/ ./packages/shared/dist/
 
 # Point shared package exports to compiled JS instead of TS source

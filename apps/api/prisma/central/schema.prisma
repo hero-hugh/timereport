@@ -36,7 +36,7 @@ model OtpCode {
 model Session {
   id            String    @id @default(uuid())
   userId        String
-  refreshToken  String    @unique
+  refreshTokenHash String @unique @map("refreshToken")
   jti           String    @unique
   previousJti   String?
   previousJtiAt DateTime?

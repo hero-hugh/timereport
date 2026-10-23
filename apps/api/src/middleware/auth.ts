@@ -1,11 +1,13 @@
 import type { Context, Next } from 'hono'
 import { getCookie } from 'hono/cookie'
+import { authDb } from '../lib/auth-db'
 import { verifyAccessToken } from '../lib/jwt'
 import { type UserPrismaClient, getUserDb } from '../lib/user-db'
 
 export interface AuthUser {
 	userId: string
 	email: string
+	sessionId: string
 }
 
 /**
@@ -32,6 +34,18 @@ export async function requireAuth(c: Context, next: Next) {
 			{ success: false, error: 'Ogiltig eller utgången token' },
 			401,
 		)
+	}
+
+	const session = await authDb.session.findFirst({
+		where: {
+			id: payload.sessionId,
+			userId: payload.userId,
+			expiresAt: { gt: new Date() },
+		},
+		select: { id: true },
+	})
+	if (!session) {
+		return c.json({ success: false, error: 'Sessionen har gått ut' }, 401)
 	}
 
 	// Sätt användare på context
